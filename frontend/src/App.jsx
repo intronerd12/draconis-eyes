@@ -200,10 +200,30 @@ function App() {
                   </p>
                   <div className="upload-form">
                     <form
-                      onSubmit={(e) => {
+                      onSubmit={async (e) => {
                         e.preventDefault()
+                        if (!file) return
+                        
                         setUploading(true)
-                        setTimeout(() => setUploading(false), 2000)
+                        try {
+                          const formData = new FormData()
+                          formData.append('file', file)
+                          
+                          const res = await fetch('http://localhost:8000/detect', {
+                            method: 'POST',
+                            body: formData
+                          })
+                          
+                          if (!res.ok) throw new Error('Analysis failed')
+                          
+                          const data = await res.json()
+                          setAnalysisResult(data)
+                        } catch (err) {
+                          console.error(err)
+                          alert('Analysis failed. Please try again.')
+                        } finally {
+                          setUploading(false)
+                        }
                       }}
                     >
                       <label className="upload-zone">
@@ -212,7 +232,11 @@ function App() {
                         <input
                           type="file"
                           accept="image/*"
-                          onChange={(e) => setFileName(e.target.files?.[0]?.name ?? '')}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0]
+                            setFileName(f?.name ?? '')
+                            setFile(f)
+                          }}
                         />
                       </label>
 

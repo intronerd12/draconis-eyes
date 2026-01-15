@@ -78,6 +78,38 @@ main {
   100% { transform: translateX(200%) skewX(-15deg); }
 }
 
+@keyframes heroFadeUp {
+  0% {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes heroGradientShift {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 100% 100%;
+  }
+}
+
+@keyframes heroPatternDrift {
+  0% {
+    background-position: center, 0 0;
+  }
+  50% {
+    background-position: center, 60px 60px;
+  }
+  100% {
+    background-position: center, 120px 120px;
+  }
+}
+
 .btn-primary {
   display: inline-flex;
   align-items: center;
@@ -341,6 +373,8 @@ nav {
               radial-gradient(circle at bottom left, #2B050B, transparent 50%);
   color: var(--white);
   padding: 120px 0 160px;
+  background-size: 160% 160%;
+  animation: heroGradientShift 22s ease-in-out infinite alternate;
 }
 
 .hero::before {
@@ -353,6 +387,9 @@ nav {
   background: 
     linear-gradient(rgba(43, 5, 11, 0.3), rgba(43, 5, 11, 0.3)),
     url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  background-position: center, 0 0;
+  background-size: cover, 120px 120px;
+  animation: heroPatternDrift 35s linear infinite;
 }
 
 .hero-bg-icons {
@@ -404,6 +441,9 @@ nav {
   display: flex;
   flex-direction: column;
   gap: 32px;
+  opacity: 0;
+  transform: translateY(24px);
+  animation: heroFadeUp 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
 }
 
 .hero-badge {
@@ -486,6 +526,9 @@ nav {
 @media (min-width: 1024px) {
   .hero-right {
     display: block;
+    opacity: 0;
+    transform: translateY(24px);
+    animation: heroFadeUp 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) 0.25s forwards;
   }
 }
 
