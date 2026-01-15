@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dragon Fruit Intelligence - Quality Detection System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <script src="script.js"></script>
+</body>
+</html>
+                <div class="logo-text">
+                    <h1>Dragon Fruit Intelligence</h1>
+                    <p class="logo-subtitle">Ripeness & Quality Detection System</p>
+                </div>
+            </div>
+            <div class="system-status">
+                <span class="status-indicator" id="statusIndicator"></span>
+                <span class="status-text" id="statusText">Initializing...</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="main-content">
+            <!-- System Overview -->
+            <section class="overview-section">
+                <div class="overview-header">
+                    <h2>System Overview</h2>
+                    <p>Advanced AI-powered dragon fruit quality analysis and ripeness detection</p>
+                </div>
+                <div class="overview-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="processedCount">0</div>
+                        <div class="stat-label">Fruits Analyzed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="avgQuality">0%</div>
+                        <div class="stat-label">Avg Quality Score</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="systemUptime">Online</div>
+                        <div class="stat-label">System Status</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Detection System Section -->
+            <section class="detection-section">
+                <div class="detection-header">
+                    <h2>Real-Time Detection Interface</h2>
+                    <p>Capture and analyze dragon fruit quality in real-time</p>
+                </div>
+
+                <div class="detection-layout">
+                    <!-- Camera Feed -->
+                    <div class="camera-panel">
+                        <div class="camera-header">
+                            <span class="camera-title">Live Camera Feed</span>
+                            <span class="camera-status" id="cameraStatus">Ready</span>
+                        </div>
+                        <div class="camera-container">
+                            <video id="camera" autoplay playsinline></video>
+                            <canvas id="canvas" style="display:none;"></canvas>
+                            <div class="camera-overlay"></div>
+                            <div class="camera-reticle"></div>
+                        </div>
+                    </div>
+
+                    <!-- Control Panel -->
+                    <div class="control-panel">
+                        <div class="control-section">
+                            <h3>Detection Controls</h3>
+                            <div class="button-group">
+                                <button id="startBtn" class="btn btn-primary">
+                                    <span class="btn-icon">▶</span>
+                                    <span class="btn-text">Start Camera</span>
+                                </button>
+                                <button id="captureBtn" class="btn btn-secondary" disabled>
+                                    <span class="btn-icon">📸</span>
+                                    <span class="btn-text">Capture & Analyze</span>
+                                </button>
+                                <button id="stopBtn" class="btn btn-danger" disabled>
+                                    <span class="btn-icon">⊘</span>
+                                    <span class="btn-text">Stop Camera</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Analysis Results -->
+                        <div class="control-section">
+                            <h3>Analysis Results</h3>
+                            <div class="results-panel">
+                                <div id="results" class="results-content">
+                                    <div class="results-placeholder">
+                                        <p>Awaiting analysis...</p>
+                                        <p class="placeholder-hint">Start camera and capture image to begin</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Detection Metrics -->
+                        <div class="control-section">
+                            <h3>Latest Metrics</h3>
+                            <div class="metrics-display">
+                                <div class="metric-row">
+                                    <span class="metric-label">Ripeness</span>
+                                    <div class="metric-bar">
+                                        <div class="metric-fill" id="metricRipeness"></div>
+                                    </div>
+                                    <span class="metric-value" id="ripenessPct">--</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Quality</span>
+                                    <div class="metric-bar">
+                                        <div class="metric-fill" id="metricQuality"></div>
+                                    </div>
+                                    <span class="metric-value" id="qualityPct">--</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Defects</span>
+                                    <div class="metric-bar">
+                                        <div class="metric-fill danger" id="metricDefects"></div>
+                                    </div>
+                                    <span class="metric-value" id="defectsPct">--</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Detailed Analysis Section -->
+            <section class="analysis-section">
+                <div class="analysis-header">
+                    <h2>Detailed Analysis Parameters</h2>
+                    <p>Comprehensive quality assessment metrics</p>
+                </div>
+
+                <div class="parameters-grid">
+                    <div class="parameter-card">
+                        <div class="parameter-icon">🔍</div>
+                        <h3>Color Analysis</h3>
+                        <p>Deep red to magenta skin indicates optimal ripeness</p>
+                        <div class="parameter-detail" id="colorDetail">Pending...</div>
+                    </div>
+                    <div class="parameter-card">
+                        <div class="parameter-icon">⚖️</div>
+                        <h3>Surface Quality</h3>
+                        <p>Detection of cracks, blemishes, or damage</p>
+                        <div class="parameter-detail" id="surfaceDetail">Pending...</div>
+                    </div>
+                    <div class="parameter-card">
+                        <div class="parameter-icon">📊</div>
+                        <h3>Size Classification</h3>
+                        <p>Estimated diameter and weight category</p>
+                        <div class="parameter-detail" id="sizeDetail">Pending...</div>
+                    </div>
+                    <div class="parameter-card">
+                        <div class="parameter-icon">🌡️</div>
+                        <h3>Ripeness Level</h3>
+                        <p>Days until optimal consumption estimated</p>
+                        <div class="parameter-detail" id="ripenessDetail">Pending...</div>
+                    </div>
+                    <div class="parameter-card">
+                        <div class="parameter-icon">✓</div>
+                        <h3>Grade Assignment</h3>
+                        <p>Premium, Grade A, Grade B, or Reject</p>
+                        <div class="parameter-detail" id="gradeDetail">Pending...</div>
+                    </div>
+                    <div class="parameter-card">
+                        <div class="parameter-icon">⚠️</div>
+                        <h3>Defect Detection</h3>
+                        <p>Identification of quality issues or abnormalities</p>
+                        <div class="parameter-detail" id="defectDetail">Pending...</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quality Standards Section -->
+            <section class="standards-section">
+                <h2>Quality Standards & Grades</h2>
+                <div class="standards-grid">
+                    <div class="standard-card premium">
+                        <div class="grade-badge">Premium</div>
+                        <p>Perfect exterior, optimal ripeness, no visible defects</p>
+                    </div>
+                    <div class="standard-card grade-a">
+                        <div class="grade-badge">Grade A</div>
+                        <p>Minor cosmetic blemishes, excellent ripeness and quality</p>
+                    </div>
+                    <div class="standard-card grade-b">
+                        <div class="grade-badge">Grade B</div>
+                        <p>Visible defects or ripeness variations, still acceptable</p>
+                    </div>
+                    <div class="standard-card reject">
+                        <div class="grade-badge">Reject</div>
+                        <p>Significant damage, over/under-ripe, unsuitable for sale</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <p>&copy; 2024 Dragon Fruit Intelligence System. Advanced Quality Detection & Analysis.</p>
+            <div class="footer-links">
+                <a href="#" class="footer-link">API Documentation</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">System Status</a>
+                <span class="separator">|</span>
+                <span class="api-status" id="apiStatus">Backend: Connecting...</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
