@@ -14,3 +14,13 @@ yarn-error.log*
 
 # Frontend build
 frontend/dist/
+
+# System
+Thumbs.db
+
+# Expo
+.expo/
+dist/
+web-build/
+mobile/.expo/
+
