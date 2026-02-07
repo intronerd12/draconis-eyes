@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, BarChart3, ScanLine, Activity, LogOut, AlertTriangle, CloudSun, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Users, BarChart3, ScanLine, Activity, LogOut, AlertTriangle, CloudSun } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const AdminLayout = () => {
@@ -26,7 +26,6 @@ const AdminLayout = () => {
     { path: '/admin/scans', icon: <ScanLine size={20} />, label: 'Scanned Items' },
     { path: '/admin/environment', icon: <CloudSun size={20} />, label: 'Environment' },
     { path: '/admin/api-health', icon: <Activity size={20} />, label: 'API Health' },
-    { path: '/admin/chatbot', icon: <MessageSquare size={20} />, label: 'AI Assistant' },
   ];
 
   return (

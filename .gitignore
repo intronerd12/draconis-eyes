@@ -1,26 +1,44 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-venv/
-.env
-
-# Node
 node_modules/
+**/node_modules/
+
+dist/
+build/
+**/dist/
+**/build/
+
+.env
+.env.*
+**/.env
+**/.env.*
+
+coverage/
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+*.log
+
 .DS_Store
-
-# Frontend build
-frontend/dist/
-
-# System
 Thumbs.db
 
-# Expo
-.expo/
-dist/
-web-build/
-mobile/.expo/
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+*.pyc
 
+*.pt
+*.pth
+*.onnx
+*.tflite
+*.h5
+*.ckpt
+runs/
+weights/
+
+Dragon Fruit Vignan.v2i.yolov11/
+Dragon Fruit Vignan.v2i.yolov8/
+
+.expo/
+**/.expo/

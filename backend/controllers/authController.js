@@ -147,6 +147,16 @@ const loginUser = async (req, res) => {
     }
 
     if (user && (await user.matchPassword(password))) {
+      const status = (user.status || 'active').toLowerCase();
+      if (status === 'inactive' || status === 'banned') {
+        const reason = (user.status_reason || '').toString().trim();
+        const reasonSuffix = reason ? ` Reason: ${reason}` : '';
+        return res.status(403).json({ message: `Your account is ${status}.${reasonSuffix}` });
+      }
+
+      user.last_login_at = new Date();
+      await user.save();
+
       res.json({
         _id: user._id,
         name: user.name,

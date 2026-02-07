@@ -42,10 +42,17 @@ const updateUser = async (req, res) => {
     const user = await User.findById(req.params.id);
 
     if (user) {
-      user.name = req.body.name || user.name;
-      user.email = req.body.email || user.email;
-      user.role = req.body.role || user.role;
-      user.status = req.body.status || user.status; // Assuming status field might be added later
+      const has = (key) => Object.prototype.hasOwnProperty.call(req.body, key);
+
+      if (has('name')) user.name = req.body.name;
+      if (has('email')) user.email = req.body.email;
+      if (has('role')) user.role = req.body.role;
+      if (has('status')) user.status = req.body.status;
+      if (user.status === 'active') {
+        user.status_reason = '';
+      } else if (has('status_reason')) {
+        user.status_reason = req.body.status_reason;
+      }
 
       const updatedUser = await user.save();
 
@@ -55,6 +62,8 @@ const updateUser = async (req, res) => {
         email: updatedUser.email,
         role: updatedUser.role,
         status: updatedUser.status,
+        status_reason: updatedUser.status_reason,
+        last_login_at: updatedUser.last_login_at,
       });
     } else {
       res.status(404).json({ message: 'User not found' });
@@ -70,14 +79,7 @@ const updateUser = async (req, res) => {
 // @access  Private/Admin
 const deleteUser = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
-
-    if (user) {
-      await user.deleteOne();
-      res.json({ message: 'User removed' });
-    } else {
-      res.status(404).json({ message: 'User not found' });
-    }
+    res.status(403).json({ message: 'User deletion is disabled' });
   } catch (err) {
     console.error('Delete User Error:', err);
     res.status(500).json({ message: 'Failed to delete user' });

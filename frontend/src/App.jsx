@@ -10,7 +10,6 @@ import Analytics from './pages/admin/Analytics'
 import ScannedItems from './pages/admin/ScannedItems'
 import ApiMonitoring from './pages/admin/ApiMonitoring'
 import EnvironmentalData from './pages/admin/EnvironmentalData'
-import AdminChatbot from './pages/admin/AdminChatbot'
 import ProtectedRoute from './components/admin/ProtectedRoute'
 import './App.css'
 
@@ -32,7 +31,7 @@ function App() {
             <Route path="scans" element={<ScannedItems />} />
             <Route path="environment" element={<EnvironmentalData />} />
             <Route path="api-health" element={<ApiMonitoring />} />
-            <Route path="chatbot" element={<AdminChatbot />} />
+            <Route path="*" element={<Navigate to="/admin" replace />} />
           </Route>
         </Route>
 

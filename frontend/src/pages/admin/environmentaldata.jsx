@@ -5,6 +5,23 @@ import { API_BASE_URL } from '../../config/api';
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 
+const normalizeKey = (s) => (s || '').toString().trim().toLowerCase();
+
+const provinceCenters = {
+  'metro manila': { lat: 14.5995, lng: 120.9842, zoom: 10 },
+  manila: { lat: 14.5995, lng: 120.9842, zoom: 10 },
+  cebu: { lat: 10.3157, lng: 123.8854, zoom: 10 },
+  davao: { lat: 7.1907, lng: 125.4553, zoom: 10 },
+  baguio: { lat: 16.4023, lng: 120.596, zoom: 11 },
+};
+
+const getMapCenter = (provinceName) => {
+  const key = normalizeKey(provinceName);
+  if (provinceCenters[key]) return { ...provinceCenters[key], label: provinceName };
+  const fallback = { lat: 12.8797, lng: 121.774, zoom: 6 };
+  return { ...fallback, label: provinceName || 'Philippines' };
+};
+
 const badgeFor = (color) => {
   if (color === 'green') return { bg: '#dcfce7', fg: '#166534', border: '#bbf7d0' };
   if (color === 'orange') return { bg: '#fef9c3', fg: '#92400e', border: '#fde68a' };
@@ -17,6 +34,8 @@ const EnvironmentalData = () => {
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingList, setLoadingList] = useState(true);
+  const [mapProvider, setMapProvider] = useState('google');
+  const [mapError, setMapError] = useState(false);
 
   const feelsLike = useMemo(() => {
     if (!weather?.temperature) return null;
@@ -80,6 +99,46 @@ const EnvironmentalData = () => {
   const status = weather?.recommendation?.status || '—';
   const recColor = weather?.recommendation?.color || 'orange';
   const badge = badgeFor(recColor);
+  const mapKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+  const mapCenter = useMemo(() => getMapCenter(selectedProvince), [selectedProvince]);
+  const googleEmbedSrc = useMemo(() => {
+    const { lat, lng, zoom } = mapCenter;
+    if (mapKey) {
+      const params = new URLSearchParams({
+        key: mapKey,
+        center: `${lat},${lng}`,
+        zoom: String(zoom || 10),
+        maptype: 'roadmap',
+      });
+      return `https://www.google.com/maps/embed/v1/view?${params.toString()}`;
+    }
+    return `https://www.google.com/maps?q=${encodeURIComponent(`${lat},${lng}`)}&z=${encodeURIComponent(String(zoom || 10))}&output=embed`;
+  }, [mapCenter, mapKey]);
+
+  const osmEmbedSrc = useMemo(() => {
+    const { lat, lng } = mapCenter;
+    const d = 0.35;
+    const left = lng - d;
+    const bottom = lat - d;
+    const right = lng + d;
+    const top = lat + d;
+    return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(
+      `${left},${bottom},${right},${top}`
+    )}&layer=mapnik&marker=${encodeURIComponent(`${lat},${lng}`)}`;
+  }, [mapCenter]);
+
+  const embedSrc = mapProvider === 'osm' ? osmEmbedSrc : googleEmbedSrc;
+  const googleOpenUrl = useMemo(() => {
+    const { lat, lng, label } = mapCenter;
+    const params = new URLSearchParams({ api: '1', query: `${lat},${lng}(${label})` });
+    return `https://www.google.com/maps/search/?${params.toString()}`;
+  }, [mapCenter]);
+  const osmOpenUrl = useMemo(() => {
+    const { lat, lng, zoom } = mapCenter;
+    return `https://www.openstreetmap.org/?mlat=${encodeURIComponent(lat)}&mlon=${encodeURIComponent(lng)}#map=${encodeURIComponent(
+      zoom || 10
+    )}/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}`;
+  }, [mapCenter]);
 
   return (
     <div>
@@ -211,6 +270,109 @@ const EnvironmentalData = () => {
                 <div style={{ marginTop: 8, fontSize: '1.6rem', fontWeight: 900, color: 'var(--gray-900)' }}>
                   {loading ? '—' : `${feelsLike ?? '—'}°C`}
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: 14,
+              boxShadow: 'var(--shadow-sm)',
+              border: '1px solid var(--gray-200)',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{ padding: 16, borderBottom: '1px solid var(--gray-200)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 900, color: 'var(--gray-900)' }}>Map</div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--gray-500)', fontWeight: 800 }}>
+                  {mapCenter.label}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMapError(false);
+                    setMapProvider('google');
+                  }}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    border: mapProvider === 'google' ? '1px solid rgba(230,0,92,0.35)' : '1px solid var(--gray-200)',
+                    backgroundColor: mapProvider === 'google' ? 'rgba(230,0,92,0.08)' : 'white',
+                    color: 'var(--gray-800)',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Google
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMapError(false);
+                    setMapProvider('osm');
+                  }}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    border: mapProvider === 'osm' ? '1px solid rgba(230,0,92,0.35)' : '1px solid var(--gray-200)',
+                    backgroundColor: mapProvider === 'osm' ? 'rgba(230,0,92,0.08)' : 'white',
+                    color: 'var(--gray-800)',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                  }}
+                >
+                  OpenStreetMap
+                </button>
+                <a
+                  href={mapProvider === 'osm' ? osmOpenUrl : googleOpenUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    border: '1px solid var(--gray-200)',
+                    backgroundColor: 'white',
+                    color: 'var(--gray-800)',
+                    fontWeight: 900,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Open
+                </a>
+              </div>
+            </div>
+            <div style={{ position: 'relative', width: '100%', height: 340, backgroundColor: 'var(--gray-50)' }}>
+              <iframe
+                title="Region map"
+                key={`${mapProvider}-${mapCenter.lat}-${mapCenter.lng}-${mapKey ? 'k' : 'nok'}`}
+                src={embedSrc}
+                style={{ border: 0, width: '100%', height: '100%' }}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                onError={() => {
+                  if (!mapError && mapProvider === 'google') {
+                    setMapError(true);
+                    setMapProvider('osm');
+                    toast.error('Google Maps failed to load. Switched to OpenStreetMap.');
+                  }
+                }}
+              />
+            </div>
+            <div style={{ padding: 12, borderTop: '1px solid var(--gray-200)', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ color: 'var(--gray-500)', fontWeight: 800, fontSize: '0.85rem' }}>
+                {mapKey ? 'Google Maps Embed API' : 'Google Maps (no key) / OpenStreetMap fallback'}
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <a href={googleOpenUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--dragon-primary)', fontWeight: 900, textDecoration: 'none' }}>
+                  Google link
+                </a>
+                <a href={osmOpenUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--dragon-primary)', fontWeight: 900, textDecoration: 'none' }}>
+                  OSM link
+                </a>
               </div>
             </div>
           </div>

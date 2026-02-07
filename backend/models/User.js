@@ -26,6 +26,11 @@ const userSchema = mongoose.Schema(
       enum: ['active', 'inactive', 'banned'],
       default: 'active',
     },
+    status_reason: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     is_email_verified: {
       type: Boolean,
       default: false,

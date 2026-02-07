@@ -79,27 +79,6 @@ const UserManagement = () => {
     }
   };
 
-  const deleteUser = async (userId) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
-        method: 'DELETE',
-      });
-      
-      if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.message || 'Failed to delete user');
-      }
-
-      setUsers((prev) => prev.filter((u) => u._id !== userId));
-      setTotal((prev) => prev - 1);
-      toast.success('User deleted');
-    } catch (e) {
-      toast.error(e?.message || 'Failed to delete user');
-    }
-  };
-
   const formatLastLogin = (iso) => {
     if (!iso) return '—';
     const d = new Date(iso);
@@ -163,8 +142,8 @@ const UserManagement = () => {
               <th style={{ padding: '15px 20px', fontWeight: '600', color: 'var(--gray-600)', fontSize: '0.85rem' }}>Name</th>
               <th style={{ padding: '15px 20px', fontWeight: '600', color: 'var(--gray-600)', fontSize: '0.85rem' }}>Role</th>
               <th style={{ padding: '15px 20px', fontWeight: '600', color: 'var(--gray-600)', fontSize: '0.85rem' }}>Status</th>
+              <th style={{ padding: '15px 20px', fontWeight: '600', color: 'var(--gray-600)', fontSize: '0.85rem' }}>Reason</th>
               <th style={{ padding: '15px 20px', fontWeight: '600', color: 'var(--gray-600)', fontSize: '0.85rem' }}>Last Login</th>
-              <th style={{ padding: '15px 20px', fontWeight: '600', color: 'var(--gray-600)', fontSize: '0.85rem', textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -208,7 +187,28 @@ const UserManagement = () => {
                 <td style={{ padding: '15px 20px' }}>
                   <select
                     value={(user.status || 'active').toLowerCase()}
-                    onChange={(e) => updateUser(user._id, { status: e.target.value })}
+                    onChange={(e) => {
+                      const nextStatus = e.target.value.toLowerCase();
+                      const currentStatus = (user.status || 'active').toLowerCase();
+                      if (nextStatus === currentStatus) return;
+
+                      if (nextStatus === 'active') {
+                        updateUser(user._id, { status: 'active', status_reason: '' });
+                        return;
+                      }
+
+                      const reason = window.prompt(
+                        `Reason for setting this user to ${nextStatus}:`,
+                        (user.status_reason || '').toString()
+                      );
+
+                      if (!reason || !reason.trim()) {
+                        toast.error('Reason is required');
+                        return;
+                      }
+
+                      updateUser(user._id, { status: nextStatus, status_reason: reason.trim() });
+                    }}
                     disabled={savingUserId === user._id}
                     style={{
                       width: '100%',
@@ -229,41 +229,34 @@ const UserManagement = () => {
                     ))}
                   </select>
                 </td>
+                <td style={{ padding: '15px 20px' }}>
+                  <input
+                    key={`${user._id}-${user.status || 'active'}-${user.status_reason || ''}`}
+                    type="text"
+                    defaultValue={(user.status_reason || '').toString()}
+                    placeholder={(user.status || 'active').toLowerCase() === 'active' ? '—' : 'Reason for inactive/banned'}
+                    disabled={(user.status || 'active').toLowerCase() === 'active' || savingUserId === user._id}
+                    onBlur={(e) => {
+                      const next = (e.target.value || '').toString().trim();
+                      const current = (user.status_reason || '').toString().trim();
+                      if (next === current) return;
+                      updateUser(user._id, { status_reason: next });
+                    }}
+                    style={{
+                      width: '100%',
+                      maxWidth: '320px',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--gray-300)',
+                      backgroundColor: (user.status || 'active').toLowerCase() === 'active' ? 'var(--gray-50)' : 'white',
+                      color: 'var(--gray-700)',
+                      fontWeight: 600,
+                      opacity: (user.status || 'active').toLowerCase() === 'active' ? 0.7 : 1,
+                    }}
+                  />
+                </td>
                 <td style={{ padding: '15px 20px', color: 'var(--gray-500)', fontSize: '0.9rem' }}>
                   {formatLastLogin(user.last_login_at)}
-                </td>
-                <td style={{ padding: '15px 20px', textAlign: 'right' }}>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard?.writeText?.(user._id);
-                        toast.success('User ID copied');
-                      }}
-                      style={{
-                        padding: '8px 10px',
-                        borderRadius: '8px',
-                        border: '1px solid var(--gray-300)',
-                        backgroundColor: 'white',
-                        color: 'var(--gray-700)',
-                        fontWeight: 600,
-                      }}
-                    >
-                      Copy ID
-                    </button>
-                    <button
-                      onClick={() => deleteUser(user._id)}
-                      style={{
-                        padding: '8px 10px',
-                        borderRadius: '8px',
-                        border: '1px solid #fee2e2',
-                        backgroundColor: '#fee2e2',
-                        color: '#ef4444',
-                        fontWeight: 600,
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
                 </td>
               </tr>
             ))}
