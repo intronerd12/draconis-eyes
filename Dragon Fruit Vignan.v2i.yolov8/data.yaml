@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['Dragon Fruit Detection - v2 2023-03-30 8-23pm']
+
+roboflow:
+  workspace: tropiscan
+  project: dragon-fruit-vignan-zodmw
+  version: 2
+  license: CC BY 4.0
+  url: https://app.roboflow.com/tropiscan/dragon-fruit-vignan-zodmw/2
