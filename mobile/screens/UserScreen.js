@@ -23,7 +23,7 @@ const THEME = {
   error: '#FF5252',
 };
 
-export default function UserScreen({ user, onLogout }) {
+export default function UserScreen({ navigation, user, onLogout, onUpdateUser }) {
   const insets = useSafeAreaInsets();
   const [logoutVisible, setLogoutVisible] = React.useState(false);
 
@@ -40,6 +40,24 @@ export default function UserScreen({ user, onLogout }) {
       console.error('Error logging out:', error);
     }
   };
+
+  const MENU_SECTIONS = [
+    {
+      title: 'Account Settings',
+      items: [
+        { id: 'edit_profile', icon: 'person-outline', title: 'Edit Profile', subtitle: 'Update your personal information', route: 'EditProfile' },
+        { id: 'notifications', icon: 'notifications-outline', title: 'Notifications', subtitle: 'Manage your alerts' },
+        { id: 'privacy', icon: 'shield-checkmark-outline', title: 'Privacy & Security', subtitle: 'Password, 2FA' },
+      ]
+    },
+    {
+      title: 'Support',
+      items: [
+        { id: 'help', icon: 'help-circle-outline', title: 'Help Center' },
+        { id: 'contact', icon: 'mail-outline', title: 'Contact Us' },
+      ]
+    }
+  ];
 
   const MenuItem = ({ icon, title, subtitle, onPress, color = THEME.textDark }) => (
     <TouchableOpacity onPress={onPress} style={styles.menuItem}>
@@ -65,12 +83,20 @@ export default function UserScreen({ user, onLogout }) {
           >
             <View style={styles.profileHeader}>
               <View style={styles.avatarContainer}>
-                <Avatar.Text 
-                  size={80} 
-                  label={user?.name ? user.name.substring(0, 2).toUpperCase() : 'DV'} 
-                  style={{ backgroundColor: THEME.white }}
-                  labelStyle={{ color: THEME.primary, fontWeight: 'bold', fontSize: 28 }}
-                />
+                {user?.avatar ? (
+                  <Avatar.Image 
+                    size={80} 
+                    source={{ uri: user.avatar }} 
+                    style={{ backgroundColor: THEME.white }}
+                  />
+                ) : (
+                  <Avatar.Text 
+                    size={80} 
+                    label={user?.name ? user.name.substring(0, 2).toUpperCase() : 'DV'} 
+                    style={{ backgroundColor: THEME.white }}
+                    labelStyle={{ color: THEME.primary, fontWeight: 'bold', fontSize: 28 }}
+                  />
+                )}
                 <View style={styles.editBadge}>
                   <Ionicons name="pencil" size={14} color={THEME.white} />
                 </View>
@@ -107,6 +133,7 @@ export default function UserScreen({ user, onLogout }) {
               icon="person-outline" 
               title="Edit Profile" 
               subtitle="Update your personal information"
+              onPress={() => navigation.navigate('EditProfile', { user })}
             />
             <MenuItem 
               icon="notifications-outline" 

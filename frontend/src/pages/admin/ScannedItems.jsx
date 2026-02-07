@@ -1,102 +1,114 @@
-import React from 'react';
-import { Eye, Download } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
+import { API_BASE_URL } from '../../config/api';
 
 const ScannedItems = () => {
-  const scans = [
-    { id: 'SC001', date: '2023-10-25 10:30 AM', user: 'Alice Johnson', grade: 'A', weight: '450g', defects: 'None', image: 'https://via.placeholder.com/50' },
-    { id: 'SC002', date: '2023-10-25 11:15 AM', user: 'Bob Smith', grade: 'B', weight: '380g', defects: 'Minor Blemish', image: 'https://via.placeholder.com/50' },
-    { id: 'SC003', date: '2023-10-25 11:45 AM', user: 'Alice Johnson', grade: 'A', weight: '460g', defects: 'None', image: 'https://via.placeholder.com/50' },
-    { id: 'SC004', date: '2023-10-25 01:20 PM', user: 'Charlie Brown', grade: 'C', weight: '320g', defects: 'Shape', image: 'https://via.placeholder.com/50' },
-    { id: 'SC005', date: '2023-10-25 02:10 PM', user: 'Bob Smith', grade: 'A', weight: '445g', defects: 'None', image: 'https://via.placeholder.com/50' },
-  ];
+  const [scans, setScans] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const getGradeColor = (grade) => {
-    switch(grade) {
-      case 'A': return '#10b981';
-      case 'B': return '#f59e0b';
-      case 'C': return '#ef4444';
-      default: return '#6b7280';
+  useEffect(() => {
+    fetchScans();
+  }, []);
+
+  const fetchScans = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/scan`);
+      if (response.ok) {
+        const data = await response.json();
+        setScans(data);
+      } else {
+        toast.error('Failed to fetch scans');
+      }
+    } catch (error) {
+      console.error('Error fetching scans:', error);
+      toast.error('Error fetching scans');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 'bold', color: 'var(--gray-800)' }}>Scanned Dragonfruit</h1>
-        <button style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '8px', 
-          padding: '10px 15px', 
-          backgroundColor: 'white', 
-          border: '1px solid var(--gray-300)', 
-          borderRadius: '8px',
-          fontWeight: '500',
-          color: 'var(--gray-700)'
-        }}>
-          <Download size={18} /> Export CSV
-        </button>
-      </div>
+      <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--gray-800)', marginBottom: 10 }}>Scanned Items</div>
+      <div style={{ color: 'var(--gray-500)', marginBottom: 22 }}>Recent scans recorded by the system.</div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-        {scans.map((scan) => (
-          <div key={scan.id} style={{ backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: 'var(--shadow-sm)', transition: 'transform 0.2s' }}>
-            <div style={{ height: '150px', backgroundColor: 'var(--gray-100)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-               <span style={{ color: 'var(--gray-400)' }}>Dragonfruit Image</span>
-            </div>
-            <div style={{ padding: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
-                <div>
-                  <h3 style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--gray-900)' }}>{scan.id}</h3>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)' }}>{scan.date}</p>
-                </div>
-                <span style={{ 
-                  padding: '4px 12px', 
-                  borderRadius: '20px', 
-                  backgroundColor: getGradeColor(scan.grade), 
-                  color: 'white', 
-                  fontWeight: 'bold',
-                  fontSize: '0.85rem'
-                }}>
-                  Grade {scan.grade}
-                </span>
-              </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.9rem', color: 'var(--gray-600)' }}>
-                <div>
-                  <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--gray-400)', marginBottom: '2px' }}>Scanned By</span>
-                  {scan.user}
-                </div>
-                <div>
-                  <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--gray-400)', marginBottom: '2px' }}>Weight</span>
-                  {scan.weight}
-                </div>
-                <div style={{ gridColumn: 'span 2' }}>
-                  <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--gray-400)', marginBottom: '2px' }}>Defects Detected</span>
-                  {scan.defects}
-                </div>
-              </div>
+      {loading ? (
+        <div
+          style={{
+            backgroundColor: 'white',
+            borderRadius: 14,
+            boxShadow: 'var(--shadow-sm)',
+            border: '1px solid var(--gray-100)',
+            height: 240,
+            display: 'grid',
+            placeItems: 'center',
+            color: 'var(--gray-500)',
+            fontWeight: 700,
+          }}
+        >
+          Loading…
+        </div>
+      ) : (
+        <div style={{ backgroundColor: 'white', borderRadius: 14, boxShadow: 'var(--shadow-sm)', overflow: 'hidden', border: '1px solid var(--gray-100)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ backgroundColor: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)' }}>
+                <th style={{ padding: '14px 16px', fontWeight: 800, color: 'var(--gray-600)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Date</th>
+                <th style={{ padding: '14px 16px', fontWeight: 800, color: 'var(--gray-600)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Grade</th>
+                <th style={{ padding: '14px 16px', fontWeight: 800, color: 'var(--gray-600)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Details</th>
+                <th style={{ padding: '14px 16px', fontWeight: 800, color: 'var(--gray-600)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Location</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scans.map((scan) => {
+                const grade = (scan.grade || '').toUpperCase();
+                const pill =
+                  grade === 'A'
+                    ? { bg: '#dcfce7', fg: '#166534' }
+                    : grade === 'B'
+                      ? { bg: '#dbeafe', fg: '#1e40af' }
+                      : grade === 'C'
+                        ? { bg: '#fef9c3', fg: '#92400e' }
+                        : { bg: '#fee2e2', fg: '#991b1b' };
 
-              <button style={{ 
-                width: '100%', 
-                marginTop: '20px', 
-                padding: '10px', 
-                backgroundColor: 'var(--gray-50)', 
-                border: '1px solid var(--gray-200)', 
-                borderRadius: '8px', 
-                color: 'var(--dragon-primary)', 
-                fontWeight: '600',
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                gap: '8px'
-              }}>
-                <Eye size={18} /> View Details
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+                return (
+                  <tr key={scan._id} style={{ borderBottom: '1px solid var(--gray-100)' }}>
+                    <td style={{ padding: '14px 16px', color: 'var(--gray-600)', fontSize: '0.9rem' }}>
+                      {scan.timestamp ? new Date(scan.timestamp).toLocaleString() : '—'}
+                    </td>
+                    <td style={{ padding: '14px 16px' }}>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          padding: '4px 10px',
+                          borderRadius: 999,
+                          backgroundColor: pill.bg,
+                          color: pill.fg,
+                          fontSize: '0.8rem',
+                          fontWeight: 900,
+                        }}
+                      >
+                        {grade || '—'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '14px 16px', color: 'var(--gray-600)', fontSize: '0.9rem' }}>{scan.details || '—'}</td>
+                    <td style={{ padding: '14px 16px', color: 'var(--gray-600)', fontSize: '0.9rem' }}>{scan.location || '—'}</td>
+                  </tr>
+                );
+              })}
+
+              {scans.length === 0 ? (
+                <tr>
+                  <td colSpan={4} style={{ padding: '18px 16px', textAlign: 'center', color: 'var(--gray-500)' }}>
+                    No scans found
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 
 const ENV_CACHE_KEY = 'env_cache_v1';
+const ENV_REPORT_CACHE_KEY = 'env_report_cache_v1';
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
 const fetchJson = async (url, { signal, headers } = {}) => {
@@ -14,9 +15,27 @@ const fetchJson = async (url, { signal, headers } = {}) => {
 
 const formatPlaceLabel = (result) => {
   if (!result || typeof result !== 'object') return null;
-  const parts = [result.name, result.admin1, result.country].filter(Boolean);
+  // Use admin1 (province) or fallback to admin2/admin3 if available
+  const region = result.admin1 || result.admin2 || result.admin3;
+  const parts = [result.name, region, result.country].filter(Boolean);
   if (!parts.length) return null;
   return parts.join(', ');
+};
+
+const formatPlaceDetails = (result) => {
+  if (!result || typeof result !== 'object') return null;
+
+  // Try to find the most "province-like" field
+  // admin1 is usually the State/Province/Region (e.g., Metro Manila, California)
+  // Fallback to admin2 or admin3 if admin1 is missing
+  const province = result.admin1 || result.admin2 || result.admin3 || result.city || null;
+
+  return {
+    label: formatPlaceLabel(result),
+    province: typeof province === 'string' ? province : null,
+    country: typeof result.country === 'string' ? result.country : null,
+    name: typeof result.name === 'string' ? result.name : null,
+  };
 };
 
 const weatherCodeToLabel = (code) => {
@@ -46,7 +65,9 @@ const getCoords = async () => {
     throw new Error('Location permission denied');
   }
   const pos = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.Balanced,
+    accuracy: Location.Accuracy.High,
+    maximumAge: 0,
+    timeout: 15000,
   });
   return {
     latitude: pos.coords.latitude,
@@ -54,13 +75,18 @@ const getCoords = async () => {
   };
 };
 
-const getPlaceFromCoords = async ({ latitude, longitude }, { signal } = {}) => {
+const getPlaceDetailsFromCoords = async ({ latitude, longitude }, { signal } = {}) => {
   const url = `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${encodeURIComponent(
     latitude
   )}&longitude=${encodeURIComponent(longitude)}&language=en`;
   const data = await fetchJson(url, { signal });
   const result = Array.isArray(data?.results) ? data.results[0] : null;
-  return formatPlaceLabel(result);
+  return formatPlaceDetails(result);
+};
+
+const getPlaceFromCoords = async ({ latitude, longitude }, { signal } = {}) => {
+  const details = await getPlaceDetailsFromCoords({ latitude, longitude }, { signal });
+  return details?.label ?? null;
 };
 
 const getWeatherFromCoords = async ({ latitude, longitude }, { signal } = {}) => {
@@ -85,8 +111,72 @@ const getWeatherFromCoords = async ({ latitude, longitude }, { signal } = {}) =>
   };
 };
 
+const getForecastFromCoords = async ({ latitude, longitude }, { signal } = {}) => {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(
+    latitude
+  )}&longitude=${encodeURIComponent(
+    longitude
+  )}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code&forecast_days=7&temperature_unit=celsius&wind_speed_unit=kmh&timezone=auto`;
+
+  const data = await fetchJson(url, { signal });
+  const current = data?.current;
+  const daily = data?.daily;
+
+  if (!current || typeof current !== 'object') {
+    throw new Error('Weather unavailable');
+  }
+
+  const days = [];
+  const time = Array.isArray(daily?.time) ? daily.time : [];
+  const tMax = Array.isArray(daily?.temperature_2m_max) ? daily.temperature_2m_max : [];
+  const tMin = Array.isArray(daily?.temperature_2m_min) ? daily.temperature_2m_min : [];
+  const precip = Array.isArray(daily?.precipitation_sum) ? daily.precipitation_sum : [];
+  const wCode = Array.isArray(daily?.weather_code) ? daily.weather_code : [];
+
+  const len = Math.min(time.length, tMax.length, tMin.length, precip.length, wCode.length);
+  for (let i = 0; i < len; i++) {
+    days.push({
+      date: typeof time[i] === 'string' ? time[i] : null,
+      maxTempC: typeof tMax[i] === 'number' ? tMax[i] : null,
+      minTempC: typeof tMin[i] === 'number' ? tMin[i] : null,
+      precipitationMm: typeof precip[i] === 'number' ? precip[i] : null,
+      weatherCode: typeof wCode[i] === 'number' ? wCode[i] : null,
+      weatherLabel: weatherCodeToLabel(wCode[i]),
+    });
+  }
+
+  return {
+    current: {
+      temperatureC: typeof current.temperature_2m === 'number' ? current.temperature_2m : null,
+      weatherCode: typeof current.weather_code === 'number' ? current.weather_code : null,
+      weatherLabel: weatherCodeToLabel(current.weather_code),
+      windKmh: typeof current.wind_speed_10m === 'number' ? current.wind_speed_10m : null,
+      observedAt: typeof current.time === 'string' ? current.time : null,
+    },
+    days,
+  };
+};
+
 const readCache = async () => {
   const raw = await AsyncStorage.getItem(ENV_CACHE_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (typeof parsed.fetchedAt !== 'number') return null;
+    if (Date.now() - parsed.fetchedAt > CACHE_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+export const getCachedEnvironment = async () => {
+  return await readCache();
+};
+
+const readReportCache = async () => {
+  const raw = await AsyncStorage.getItem(ENV_REPORT_CACHE_KEY);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
@@ -107,6 +197,14 @@ const writeCache = async (payload) => {
   }
 };
 
+const writeReportCache = async (payload) => {
+  try {
+    await AsyncStorage.setItem(ENV_REPORT_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    return;
+  }
+};
+
 export const getEnvironment = async ({ force = false, signal } = {}) => {
   if (!force) {
     const cached = await readCache();
@@ -114,18 +212,42 @@ export const getEnvironment = async ({ force = false, signal } = {}) => {
   }
 
   const coords = await getCoords();
-  const [placeLabel, weather] = await Promise.all([
-    getPlaceFromCoords(coords, { signal }).catch(() => null),
+  const [place, weather] = await Promise.all([
+    getPlaceDetailsFromCoords(coords, { signal }).catch(() => null),
     getWeatherFromCoords(coords, { signal }),
   ]);
 
   const payload = {
     coords,
-    placeLabel,
+    place,
+    placeLabel: place?.label || null,
     weather,
     fetchedAt: Date.now(),
   };
 
   await writeCache(payload);
+  return payload;
+};
+
+export const getEnvironmentalReport = async ({ force = false, signal } = {}) => {
+  if (!force) {
+    const cached = await readReportCache();
+    if (cached) return cached;
+  }
+
+  const coords = await getCoords();
+  const [place, forecast] = await Promise.all([
+    getPlaceDetailsFromCoords(coords, { signal }).catch(() => null),
+    getForecastFromCoords(coords, { signal }),
+  ]);
+
+  const payload = {
+    coords,
+    place,
+    forecast,
+    fetchedAt: Date.now(),
+  };
+
+  await writeReportCache(payload);
   return payload;
 };

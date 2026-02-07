@@ -1,0 +1,2 @@
+{"analysis_id": "c51fbb9e-2bd0-4997-be22-36db8606d277", "correct_grade": "B", "correct_weight_grams": 500.0, "correct_price_per_kg": 4.2, "timestamp": "2026-02-04T00:42:47.708915+00:00"}
+{"analysis_id": "ddfcc490-7445-4916-98a9-2934b9071aef", "correct_grade": "A", "correct_price_per_kg": 260.0, "currency": "PHP", "timestamp": "2026-02-05T05:43:32.855349+00:00", "features": {"quality_score": 98.0, "ripeness_score": 99.0, "defect_probability": 2.4, "fruit_area_ratio": 0.868135, "color_score": 4.41, "grade_num": 3.0, "size_num": 3.0}}

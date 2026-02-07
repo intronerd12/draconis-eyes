@@ -44,14 +44,13 @@ const getGreeting = () => {
 };
 
 const TIPS = [
-  { id: 1, title: 'Picking Ripe Fruit', icon: 'nutrition', color: '#FF7675' },
-  { id: 2, title: 'Storage Tips', icon: 'snow', color: '#74B9FF' },
-  { id: 3, title: 'Health Benefits', icon: 'heart', color: '#55EFC4' },
+  { id: 1, key: 'picking', title: 'Picking Ripe Fruit', icon: 'nutrition', color: '#FF7675' },
+  { id: 2, key: 'storage', title: 'Storage Tips', icon: 'snow', color: '#74B9FF' },
+  { id: 3, key: 'health', title: 'Health Benefits', icon: 'heart', color: '#55EFC4' },
 ];
 
 import { ScanService } from '../services/ScanService';
 import { useFocusEffect } from '@react-navigation/native';
-import { getEnvironment } from '../services/EnvironmentService';
 
 export default function HomeScreen({ user, onLogout }) {
   const navigation = useNavigation();
@@ -60,54 +59,13 @@ export default function HomeScreen({ user, onLogout }) {
   const [stats, setStats] = React.useState({ total: 0, best: '-', avg: '0%' });
   const [recentScans, setRecentScans] = React.useState([]);
   const [logoutVisible, setLogoutVisible] = React.useState(false);
-  const [environment, setEnvironment] = React.useState(null);
-  const [environmentLoading, setEnvironmentLoading] = React.useState(false);
-  const [environmentError, setEnvironmentError] = React.useState(null);
 
   // Load data when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      let active = true;
       loadData();
-
-      const refreshEnvironment = async () => {
-        setEnvironmentLoading(true);
-        setEnvironmentError(null);
-        try {
-          const data = await getEnvironment({ force: false });
-          if (!active) return;
-          setEnvironment(data);
-        } catch (e) {
-          if (!active) return;
-          const msg = e && typeof e === 'object' && 'message' in e ? e.message : null;
-          setEnvironmentError(typeof msg === 'string' ? msg : 'Unable to load location/weather');
-        } finally {
-          if (!active) return;
-          setEnvironmentLoading(false);
-        }
-      };
-
-      refreshEnvironment();
-
-      return () => {
-        active = false;
-      };
     }, [])
   );
-
-  const forceRefreshEnvironment = async () => {
-    setEnvironmentLoading(true);
-    setEnvironmentError(null);
-    try {
-      const data = await getEnvironment({ force: true });
-      setEnvironment(data);
-    } catch (e) {
-      const msg = e && typeof e === 'object' && 'message' in e ? e.message : null;
-      setEnvironmentError(typeof msg === 'string' ? msg : 'Unable to load location/weather');
-    } finally {
-      setEnvironmentLoading(false);
-    }
-  };
 
   const loadData = async () => {
     const s = await ScanService.getStats();
@@ -278,54 +236,6 @@ export default function HomeScreen({ user, onLogout }) {
         showsVerticalScrollIndicator={false}
         style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
       >
-        <Surface style={styles.envCard} elevation={3}>
-          <LinearGradient
-            colors={['#ffffff', '#fdf0f7']}
-            style={styles.envGradient}
-          >
-            <View style={styles.envTopRow}>
-              <View style={styles.envRowLeft}>
-                <Ionicons name="location-outline" size={16} color={THEME.primaryDark} />
-                <Text style={styles.envLocationText} numberOfLines={1}>
-                  {environment?.placeLabel || (environmentLoading ? 'Getting your location…' : 'Location unavailable')}
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={forceRefreshEnvironment}
-                style={styles.envRefreshBtn}
-                disabled={environmentLoading}
-                activeOpacity={0.8}
-              >
-                <Ionicons
-                  name={environmentLoading ? 'time-outline' : 'refresh-outline'}
-                  size={18}
-                  color={THEME.primary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.envBottomRow}>
-              <Ionicons name="cloud-outline" size={18} color={THEME.primaryDark} />
-              <Text style={styles.envWeatherText} numberOfLines={1}>
-                {environment?.weather?.temperatureC != null
-                  ? `${Math.round(environment.weather.temperatureC)}°C • ${environment.weather.weatherLabel}`
-                  : environmentLoading
-                    ? 'Loading weather…'
-                    : 'Weather unavailable'}
-              </Text>
-            </View>
-
-            {environmentError ? (
-              <Text style={styles.envErrorText} numberOfLines={2}>
-                {environmentError === 'Location permission denied'
-                  ? 'Enable location permission to show local weather.'
-                  : environmentError}
-              </Text>
-            ) : null}
-          </LinearGradient>
-        </Surface>
-
         {/* Floating Stats Cards */}
         <View style={styles.statsRow}>
           <Surface style={styles.statCard} elevation={4}>
@@ -377,15 +287,84 @@ export default function HomeScreen({ user, onLogout }) {
           </View>
         </View>
 
+        {/* Mapping & Environmental Data */}
+        <View style={styles.mapEnvSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Mapping & Environmental Data</Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('MappingEnvironment')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.seeAllText}>Open</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Surface style={styles.mapEnvCard} elevation={3}>
+            <LinearGradient
+              colors={['#FFFFFF', '#F7F2F8']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.mapEnvGradient}
+            >
+              <View style={styles.mapEnvTopRow}>
+                <View style={styles.mapEnvIcon}>
+                  <Ionicons name="earth-outline" size={22} color={THEME.primaryDark} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.mapEnvHeadline}>Location insights for your farm</Text>
+                  <Text style={styles.mapEnvSubtext} numberOfLines={2}>
+                    Forecast, suitability, and mapping tools in one dashboard.
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.mapEnvActionsRow}>
+                <TouchableOpacity
+                  style={[styles.mapEnvAction, { backgroundColor: '#E3F2FD' }]}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('MappingEnvironment', { openMap: true })}
+                >
+                  <Ionicons name="map-outline" size={18} color="#1565C0" />
+                  <Text style={styles.mapEnvActionText}>Mapping</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.mapEnvAction, { backgroundColor: '#E8F5E9' }]}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('Weather')}
+                >
+                  <Ionicons name="partly-sunny-outline" size={18} color="#2E7D32" />
+                  <Text style={styles.mapEnvActionText}>Environment</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.mapEnvAction, { backgroundColor: '#F3E5F5' }]}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('MappingEnvironment')}
+                >
+                  <Ionicons name="analytics-outline" size={18} color={THEME.primaryDark} />
+                  <Text style={styles.mapEnvActionText}>Dashboard</Text>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+          </Surface>
+        </View>
+
         {/* Tips Section */}
         <View style={styles.tipsSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Pro Tips</Text>
-            <TouchableOpacity><Text style={styles.seeAllText}>View Guide</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('Guide')}>
+              <Text style={styles.seeAllText}>View Guide</Text>
+            </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tipsScroll}>
             {TIPS.map((tip, index) => (
-              <TouchableOpacity key={tip.id} style={[styles.tipCard, { marginRight: 15 }]}>
+              <TouchableOpacity 
+                key={tip.id} 
+                style={[styles.tipCard, { marginRight: 15 }]}
+                onPress={() => navigation.navigate('Guide', { initialTab: tip.key })}
+              >
                 <LinearGradient
                   colors={[tip.color, '#ffffff']}
                   start={{ x: 0, y: 0 }}
@@ -547,61 +526,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
-  envCard: {
-    marginHorizontal: 20,
-    marginTop: 12,
-    marginBottom: 10,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: THEME.white,
-  },
-  envGradient: {
-    padding: 14,
-  },
-  envTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  envRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 10,
-  },
-  envLocationText: {
-    marginLeft: 8,
-    color: THEME.textDark,
-    fontSize: 13,
-    fontWeight: '600',
-    flex: 1,
-  },
-  envRefreshBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(199,21,133,0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  envBottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  envWeatherText: {
-    marginLeft: 8,
-    color: THEME.textLight,
-    fontSize: 13,
-    fontWeight: '500',
-    flex: 1,
-  },
-  envErrorText: {
-    marginTop: 10,
-    color: '#D63031',
-    fontSize: 12,
-    fontWeight: '500',
-  },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -706,6 +630,73 @@ const styles = StyleSheet.create({
     height: 6,
     backgroundColor: THEME.seeds,
     borderRadius: 3,
+  },
+  weatherBtn: {
+    marginTop: 15,
+    backgroundColor: '#F3E5F5',
+    borderRadius: 20,
+    elevation: 2,
+  },
+  mapEnvSection: {
+    marginBottom: 25,
+  },
+  mapEnvCard: {
+    marginHorizontal: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: THEME.white,
+  },
+  mapEnvGradient: {
+    padding: 18,
+  },
+  mapEnvTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  mapEnvIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  mapEnvHeadline: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: THEME.textDark,
+    marginBottom: 2,
+  },
+  mapEnvSubtext: {
+    fontSize: 12.5,
+    fontWeight: '500',
+    color: THEME.textLight,
+    lineHeight: 18,
+  },
+  mapEnvActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  mapEnvAction: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.04)',
+    gap: 8,
+  },
+  mapEnvActionText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: THEME.textDark,
   },
   tipsSection: {
     marginBottom: 25,

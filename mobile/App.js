@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
 import { Provider as PaperProvider, ActivityIndicator } from 'react-native-paper';
 import { View, Text, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -10,9 +11,57 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthScreen from './screens/AuthScreen';
 import HomeScreen from './screens/HomeScreen';
 import ScanScreen from './screens/ScanScreen';
+import SortingGradingScreen from './screens/SortingGradingScreen';
 import UserScreen from './screens/UserScreen';
+import ChatbotScreen from './screens/ChatbotScreen';
+import GuideScreen from './screens/GuideScreen';
+import WeatherScreen from './screens/WeatherScreen';
+import EditProfileScreen from './screens/EditProfileScreen';
+import MappingEnvironmentScreen from './screens/MappingEnvironmentScreen';
 
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
+
+function MainTabs({ user, handleLogout }) {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+
+          if (route.name === 'Home') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Scan') {
+            iconName = focused ? 'scan' : 'scan-outline';
+          } else if (route.name === 'Sorting') {
+            iconName = focused ? 'funnel' : 'funnel-outline';
+          } else if (route.name === 'Chat') {
+            iconName = focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline';
+          } else if (route.name === 'User') {
+            iconName = focused ? 'person' : 'person-outline';
+          }
+
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: '#C71585',
+        tabBarInactiveTintColor: 'gray',
+        headerShown: false,
+      })}
+    >
+      <Tab.Screen name="Home">
+        {props => <HomeScreen {...props} user={user} onLogout={handleLogout} />}
+      </Tab.Screen>
+      <Tab.Screen name="Scan" component={ScanScreen} />
+      <Tab.Screen name="Sorting" component={SortingGradingScreen} />
+      <Tab.Screen name="Chat">
+        {props => <ChatbotScreen {...props} user={user} />}
+      </Tab.Screen>
+      <Tab.Screen name="User">
+        {props => <UserScreen {...props} user={user} onLogout={handleLogout} />}
+      </Tab.Screen>
+    </Tab.Navigator>
+  );
+}
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -37,10 +86,17 @@ export default function App() {
 
   const handleLogin = (userData) => {
     setUser(userData);
+    AsyncStorage.setItem('user', JSON.stringify(userData));
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setUser(null);
+    await AsyncStorage.removeItem('user');
+  };
+
+  const handleUpdateUser = async (updatedUser) => {
+    setUser(updatedUser);
+    await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
   };
 
   if (loading) {
@@ -55,34 +111,17 @@ export default function App() {
     <PaperProvider>
       <NavigationContainer>
         {user ? (
-          <Tab.Navigator
-            screenOptions={({ route }) => ({
-              tabBarIcon: ({ focused, color, size }) => {
-                let iconName;
-
-                if (route.name === 'Home') {
-                  iconName = focused ? 'home' : 'home-outline';
-                } else if (route.name === 'Scan') {
-                  iconName = focused ? 'scan' : 'scan-outline';
-                } else if (route.name === 'User') {
-                  iconName = focused ? 'person' : 'person-outline';
-                }
-
-                return <Ionicons name={iconName} size={size} color={color} />;
-              },
-              tabBarActiveTintColor: '#C71585',
-              tabBarInactiveTintColor: 'gray',
-              headerShown: false,
-            })}
-          >
-            <Tab.Screen name="Home">
-              {props => <HomeScreen {...props} user={user} onLogout={handleLogout} />}
-            </Tab.Screen>
-            <Tab.Screen name="Scan" component={ScanScreen} />
-            <Tab.Screen name="User">
-              {props => <UserScreen {...props} user={user} onLogout={handleLogout} />}
-            </Tab.Screen>
-          </Tab.Navigator>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="MainTabs">
+              {props => <MainTabs {...props} user={user} handleLogout={handleLogout} />}
+            </Stack.Screen>
+            <Stack.Screen name="Guide" component={GuideScreen} />
+            <Stack.Screen name="Weather" component={WeatherScreen} />
+            <Stack.Screen name="MappingEnvironment" component={MappingEnvironmentScreen} />
+            <Stack.Screen name="EditProfile">
+              {props => <EditProfileScreen {...props} onUpdateUser={handleUpdateUser} />}
+            </Stack.Screen>
+          </Stack.Navigator>
         ) : (
           <AuthScreen onLogin={handleLogin} />
         )}

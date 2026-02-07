@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Dimensions, Animated, Alert, Button } from 'react-native';
-import { Text, ActivityIndicator } from 'react-native-paper';
+import { View, StyleSheet, TouchableOpacity, Dimensions, Animated, Alert, Image, ScrollView } from 'react-native';
+import { Text, ActivityIndicator, Button as PaperButton, Card, Title, Paragraph, Chip, Divider, Surface } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,8 +13,10 @@ const { width, height } = Dimensions.get('window');
 export default function ScanScreen() {
   const navigation = useNavigation();
   const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const [permission, requestPermission] = useCameraPermissions();
+  const cameraRef = useRef(null);
 
   const startScanAnimation = () => {
     Animated.loop(
@@ -39,18 +42,16 @@ export default function ScanScreen() {
   }, [permission]);
 
   if (!permission) {
-    // Camera permissions are still loading.
     return <View style={styles.container} />;
   }
 
   if (!permission.granted) {
-    // Camera permissions are not granted yet.
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={{ textAlign: 'center', color: 'white', marginBottom: 20 }}>
           We need your permission to show the camera
         </Text>
-        <Button onPress={requestPermission} title="Grant Permission" />
+        <PaperButton onPress={requestPermission} mode="contained">Grant Permission</PaperButton>
         <TouchableOpacity onPress={() => navigation.navigate('Home')} style={{ marginTop: 20 }}>
           <Text style={{ color: 'white' }}>Cancel</Text>
         </TouchableOpacity>
@@ -59,40 +60,202 @@ export default function ScanScreen() {
   }
 
   const handleScan = async () => {
+    if (scanning) return;
+    if (!cameraRef.current) return;
+
     setScanning(true);
     
-    // Simulate processing time
-    setTimeout(async () => {
-      try {
-        // Randomly generate a result
-        const grades = ['A', 'B', 'C', 'D'];
-        const randomGrade = grades[Math.floor(Math.random() * grades.length)];
-        
-        await ScanService.addScan({
-          grade: randomGrade,
-          details: 'Simulated Scan Result',
-          timestamp: new Date().toISOString()
-        });
+    try {
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.7,
+        skipProcessing: true,
+      });
 
-        Alert.alert(
-          "Scan Complete",
-          `Dragonfruit Quality: ${randomGrade}`,
-          [
-            { text: "OK", onPress: () => navigation.navigate('Home') }
-          ]
-        );
-      } catch (error) {
-        console.error(error);
-        Alert.alert("Error", "Could not save scan");
-      } finally {
-        setScanning(false);
-      }
-    }, 2000);
+      // Analyze Image
+      const result = await ScanService.analyzeImage(photo.uri);
+      
+      // Save to History
+      await ScanService.addScan({
+        ...result,
+        imageUri: photo.uri // Save local URI for display
+      });
+
+      setScanResult({ ...result, imageUri: photo.uri });
+
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Scan Error", "Could not analyze image. Please try again.");
+    } finally {
+      setScanning(false);
+    }
   };
 
+  const handleReset = () => {
+    setScanResult(null);
+    setScanning(false);
+  };
+
+  const formatPesoPerKg = (amount) => {
+    const value = typeof amount === 'number' ? amount : Number(amount);
+    if (!Number.isFinite(value)) return '₱0.00/kg';
+    return `₱${value.toFixed(2)}/kg`;
+  };
+
+  // --- RESULT VIEW ---
+  if (scanResult) {
+    const segPreviewUri =
+      scanResult.segmentation_preview_base64
+        ? `data:image/jpeg;base64,${scanResult.segmentation_preview_base64}`
+        : null;
+
+    return (
+      <View style={styles.resultContainer}>
+        <LinearGradient
+          colors={['#C71585', '#000000']}
+          style={styles.resultHeader}
+        >
+          <TouchableOpacity onPress={handleReset} style={styles.closeBtn}>
+            <Ionicons name="close" size={30} color="#FFF" />
+          </TouchableOpacity>
+          <Text style={styles.resultTitle}>Analysis Complete</Text>
+          <View style={{ width: 30 }} />
+        </LinearGradient>
+
+        <ScrollView contentContainerStyle={styles.resultContent}>
+          {scanResult.is_valid_fruit === false && (
+            <Surface style={styles.warningCard} elevation={4}>
+              <View style={styles.warningContent}>
+                <Ionicons name="alert-circle" size={32} color="#FFF" />
+                <Text style={styles.warningText}>
+                  {scanResult.warning_message || "Warning: The picture is not a dragon fruit."}
+                </Text>
+              </View>
+            </Surface>
+          )}
+
+          <Image source={{ uri: scanResult.imageUri }} style={styles.resultImage} />
+          {segPreviewUri && (
+            <Card style={styles.resultCard}>
+              <Card.Title title="Segmentation Preview" />
+              <Card.Content>
+                <Image source={{ uri: segPreviewUri }} style={styles.segmentationImage} />
+                <View style={styles.segMetaRow}>
+                  <Chip icon="crop" style={styles.chip}>
+                    Area {Math.round((scanResult.fruit_area_ratio || 0) * 100)}%
+                  </Chip>
+                  <Chip icon="ruler" style={styles.chip}>
+                    {scanResult.size_category}
+                  </Chip>
+                </View>
+              </Card.Content>
+            </Card>
+          )}
+          
+          <Card style={styles.resultCard}>
+            <Card.Content>
+              <View style={styles.gradeContainer}>
+                <View>
+                  <Title style={styles.gradeLabel}>Grade</Title>
+                  <Text
+                    style={[
+                      styles.gradeValue,
+                      {
+                        color:
+                          scanResult.grade === 'A'
+                            ? '#4CAF50'
+                            : scanResult.grade === 'B'
+                              ? '#FFC107'
+                              : scanResult.grade === 'C'
+                                ? '#FF5252'
+                                : '#B0BEC5',
+                      },
+                    ]}
+                  >
+                    {scanResult.grade}
+                  </Text>
+                </View>
+                <View style={styles.priceContainer}>
+                  <Text style={styles.priceLabel}>Est. Price</Text>
+                  <Text style={styles.priceValue}>{formatPesoPerKg(scanResult.estimated_price_per_kg)}</Text>
+                </View>
+              </View>
+
+              <Divider style={{ marginVertical: 10 }} />
+              
+              <Title style={{ fontSize: 18, marginBottom: 5 }}>{scanResult.fruit_type}</Title>
+              <Paragraph style={{ color: '#666' }}>{scanResult.notes}</Paragraph>
+
+              <View style={styles.tagsContainer}>
+                <Chip icon="clock" style={styles.chip}>{scanResult.shelf_life_label}</Chip>
+                <Chip icon="shape" style={styles.chip}>{scanResult.size_category}</Chip>
+                {scanResult.market_value_label && (
+                  <Chip icon="tag" style={styles.chip}>{scanResult.market_value_label}</Chip>
+                )}
+              </View>
+            </Card.Content>
+          </Card>
+
+          <Card style={styles.resultCard}>
+            <Card.Title title="Detailed Analysis" />
+            <Card.Content>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Approx. Weight:</Text>
+                <Text style={styles.detailValue}>{scanResult.weight_grams_est} g</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Sorting Lane:</Text>
+                <Text style={styles.detailValue}>{scanResult.sorting_lane || '—'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Ripeness Score:</Text>
+                <Text style={styles.detailValue}>{scanResult.ripeness_score}%</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Quality Score:</Text>
+                <Text style={styles.detailValue}>{scanResult.quality_score}%</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Wings Condition:</Text>
+                <Text style={styles.detailValue}>{scanResult.wings_condition}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Shape Quality:</Text>
+                <Text style={styles.detailValue}>{scanResult.shape_quality}</Text>
+              </View>
+              {scanResult.color_analysis && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Color:</Text>
+                  <Text style={styles.detailValue}>
+                    R {scanResult.color_analysis.r} / G {scanResult.color_analysis.g} / B {scanResult.color_analysis.b}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Disease Status:</Text>
+                <Text style={[styles.detailValue, { color: scanResult.defect_level === 'high' ? 'red' : 'black' }]}>
+                  {scanResult.disease_status}
+                </Text>
+              </View>
+            </Card.Content>
+          </Card>
+
+          <PaperButton 
+            mode="contained" 
+            onPress={handleReset} 
+            style={styles.scanAgainBtn}
+            buttonColor="#C71585"
+          >
+            Scan Another
+          </PaperButton>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // --- CAMERA VIEW ---
   return (
     <View style={styles.container}>
-      <CameraView style={styles.cameraPreview} facing="back" />
+      <CameraView ref={cameraRef} style={styles.cameraPreview} facing="back" />
 
       {/* Overlay */}
       <View style={styles.overlay}>
@@ -149,10 +312,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#1a1a1a',
   },
-  simulationText: {
-    color: 'rgba(255,255,255,0.5)',
-    marginBottom: 20,
-  },
   overlay: {
     flex: 1,
     justifyContent: 'space-between',
@@ -163,6 +322,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
+    marginTop: 20,
   },
   closeBtn: {
     padding: 10,
@@ -199,36 +359,162 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   instruction: {
-    color: '#FFF',
+    color: 'white',
     textAlign: 'center',
-    marginTop: 20,
     fontSize: 16,
+    marginTop: 20,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: {width: -1, height: 1},
+    textShadowRadius: 10
   },
   controls: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 20,
   },
   captureBtnOuter: {
     width: 80,
     height: 80,
     borderRadius: 40,
     borderWidth: 4,
-    borderColor: '#FFF',
+    borderColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
   },
   captureBtnInner: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: 'rgba(255,255,255,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   captureBtnCore: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#FFF',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'white',
   },
+  // Result Styles
+  resultContainer: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+  },
+  resultHeader: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  resultTitle: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  resultContent: {
+    padding: 20,
+  },
+  resultImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 15,
+    marginBottom: 20,
+  },
+  segmentationImage: {
+    width: '100%',
+    height: 210,
+    borderRadius: 12,
+    marginBottom: 12,
+    backgroundColor: '#F0F0F0',
+  },
+  segMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  warningCard: {
+    backgroundColor: '#FF5252',
+    margin: 20,
+    marginBottom: 0,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  warningContent: {
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  warningText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 12,
+    flex: 1,
+  },
+  resultCard: {
+    marginBottom: 15,
+    borderRadius: 15,
+    elevation: 4,
+  },
+  gradeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  gradeLabel: {
+    fontSize: 16,
+    color: '#888',
+  },
+  gradeValue: {
+    fontSize: 48,
+    fontWeight: 'bold',
+  },
+  priceContainer: {
+    alignItems: 'flex-end',
+  },
+  priceLabel: {
+    fontSize: 14,
+    color: '#888',
+  },
+  priceValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2196F3',
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 10,
+    gap: 8,
+  },
+  chip: {
+    backgroundColor: '#E3F2FD',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEE',
+    paddingBottom: 5,
+  },
+  detailLabel: {
+    color: '#666',
+    fontSize: 14,
+  },
+  detailValue: {
+    fontWeight: '600',
+    fontSize: 14,
+    maxWidth: '60%',
+    textAlign: 'right',
+  },
+  scanAgainBtn: {
+    marginTop: 10,
+    marginBottom: 30,
+    paddingVertical: 8,
+    borderRadius: 25,
+  }
 });

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { BRAND_NAME, BRAND_TAGLINE } from '../config/brand'
 import '../App.css'
 
 function Auth() {
@@ -93,7 +94,7 @@ function Auth() {
       // Success
       localStorage.setItem('user', JSON.stringify(data))
       
-      toast.success(isLogin ? 'Welcome back! 🐲' : 'Account created successfully! 🎉', {
+      toast.success(isLogin ? `Welcome back to ${BRAND_NAME}` : `Account created on ${BRAND_NAME}`, {
         style: {
           borderRadius: '10px',
           background: '#333',
@@ -132,12 +133,12 @@ function Auth() {
     <div className="auth-container">
       <div className="auth-card">
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🐲</div>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🌴</div>
             <h1 style={{ fontSize: '28px', fontWeight: '800', color: 'var(--gray-900)', letterSpacing: '-0.5px' }}>
-              {isLogin ? 'Welcome Back' : 'Create Account'}
+              {isLogin ? `Sign in to ${BRAND_NAME}` : `Create your ${BRAND_NAME} account`}
             </h1>
             <p style={{ color: 'var(--gray-500)', marginTop: '8px', fontSize: '15px' }}>
-              {isLogin ? 'Enter your credentials to access the system' : 'Sign up to start analyzing dragon fruits'}
+              {isLogin ? BRAND_TAGLINE : 'Create an account to start scanning and grading.'}
             </p>
           </div>
 

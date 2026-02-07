@@ -21,43 +21,41 @@ const registerUser = async (req, res) => {
     return res.status(400).json({ message: 'Please add all fields' });
   }
 
-  // Check if user exists
-  const userExists = await User.findOne({ email });
+  try {
+    // Check if user exists
+    const userExists = await User.findOne({ email });
 
-  if (userExists && userExists.isEmailVerified) {
-    return res.status(400).json({ message: 'User already exists' });
-  }
+    if (userExists && userExists.is_email_verified) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
 
-  // Hash password
-  const salt = await bcrypt.genSalt(10);
-  const hashedPassword = await bcrypt.hash(password, salt);
+    // Generate verification token
+    const verificationCode = crypto.randomBytes(3).toString('hex').toUpperCase(); // 6 chars
+    const verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-  // Generate verification token
-  const verificationToken = crypto.randomBytes(3).toString('hex').toUpperCase(); // 6 chars
+    let user;
 
-  let user;
+    if (userExists && !userExists.is_email_verified) {
+      // Update existing unverified user
+      userExists.name = name;
+      userExists.password = password; // Pre-save hook will hash this
+      userExists.verificationCode = verificationCode;
+      userExists.verificationCodeExpires = verificationCodeExpires;
+      
+      user = await userExists.save();
+    } else {
+      // Create new user
+      user = await User.create({
+        name,
+        email,
+        password, // Pre-save hook will hash this
+        verificationCode,
+        verificationCodeExpires
+      });
+    }
 
-  if (userExists && !userExists.isEmailVerified) {
-    // Update existing unverified user
-    userExists.name = name;
-    userExists.password = hashedPassword;
-    userExists.verificationToken = verificationToken;
-    userExists.verificationTokenExpires = Date.now() + 10 * 60 * 1000;
-    user = await userExists.save();
-  } else {
-    // Create new user
-    user = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      verificationToken,
-      verificationTokenExpires: Date.now() + 10 * 60 * 1000, // 10 minutes
-    });
-  }
-
-  if (user) {
-    try {
-      const message = `Your verification code is: ${verificationToken}`;
+    if (user) {
+      const message = `Your verification code is: ${verificationCode}`;
       const emailResult = await sendEmail({
         email: user.email,
         subject: 'Email Verification',
@@ -65,8 +63,6 @@ const registerUser = async (req, res) => {
       });
 
       if (!emailResult.success) {
-        // If email fails, we should probably rollback the user creation or at least warn
-        // For now, we'll return a server error so the frontend knows something went wrong
         throw new Error(`Email sending failed: ${emailResult.error}`);
       }
 
@@ -76,22 +72,21 @@ const registerUser = async (req, res) => {
         requiresVerification: true,
         email: user.email
       });
-    } catch (error) {
-      console.error('Registration Error:', error);
-      
-      // If user was created but email failed, we might want to delete the user
-      // so they can try again with the same email.
-      if (user && !userExists) {
-        await User.deleteOne({ _id: user._id });
-      }
-
-      res.status(500).json({
-        success: false,
-        message: 'Registration failed: Could not send verification email. Please try again later.'
-      });
+    } else {
+      res.status(400).json({ message: 'Invalid user data' });
     }
-  } else {
-    res.status(400).json({ message: 'Invalid user data' });
+  } catch (error) {
+    console.error('Registration Error:', error);
+    
+    // Cleanup if email failed (and user was just created)
+    if (error.message.includes('Email sending failed')) {
+       await User.deleteOne({ email: email, is_email_verified: false });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Registration failed: Could not send verification email. Please try again later.'
+    });
   }
 };
 
@@ -101,30 +96,36 @@ const registerUser = async (req, res) => {
 const verifyEmail = async (req, res) => {
   const { email, code } = req.body;
 
-  const user = await User.findOne({ 
-    email, 
-    verificationToken: code,
-    verificationTokenExpires: { $gt: Date.now() }
-  });
+  try {
+    const user = await User.findOne({
+      email,
+      verificationCode: code,
+      verificationCodeExpires: { $gt: Date.now() },
+    });
 
-  if (!user) {
-    return res.status(400).json({ message: 'Invalid or expired verification code' });
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired verification code' });
+    }
+
+    user.is_email_verified = true;
+    user.verificationCode = undefined;
+    user.verificationCodeExpires = undefined;
+    
+    const updatedUser = await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Email verified successfully',
+      _id: updatedUser._id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      token: generateToken(updatedUser._id),
+    });
+  } catch (error) {
+    console.error('Verification Error:', error);
+    res.status(500).json({ message: 'Server error during verification' });
   }
-
-  user.isEmailVerified = true;
-  user.verificationToken = undefined;
-  user.verificationTokenExpires = undefined;
-  await user.save();
-
-  res.status(200).json({
-    success: true,
-    message: 'Email verified successfully',
-    _id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    token: generateToken(user._id),
-  });
 };
 
 // @desc    Authenticate a user
@@ -133,27 +134,32 @@ const verifyEmail = async (req, res) => {
 const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
-  // Check for user email
-  const user = await User.findOne({ email }).select('+password');
+  try {
+    // Check for user email
+    const user = await User.findOne({ email });
 
-  if (!user) {
-    return res.status(404).json({ message: 'No user found' });
-  }
+    if (!user) {
+      return res.status(404).json({ message: 'No user found' });
+    }
 
-  if (!user.isEmailVerified) {
-    return res.status(401).json({ message: 'Please verify your email address' });
-  }
+    if (!user.is_email_verified) {
+      return res.status(401).json({ message: 'Please verify your email address' });
+    }
 
-  if (user && (await bcrypt.compare(password, user.password))) {
-    res.json({
-      _id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token: generateToken(user._id),
-    });
-  } else {
-    res.status(401).json({ message: 'Invalid credentials' });
+    if (user && (await user.matchPassword(password))) {
+      res.json({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        token: generateToken(user._id),
+      });
+    } else {
+      res.status(401).json({ message: 'Invalid credentials' });
+    }
+  } catch (error) {
+    console.error('Login Error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -161,6 +167,7 @@ const loginUser = async (req, res) => {
 // @route   GET /api/auth/me
 // @access  Private
 const getMe = async (req, res) => {
+  // Assuming req.user is set by middleware (which isn't implemented yet in routes)
   res.status(200).json(req.user);
 };
 

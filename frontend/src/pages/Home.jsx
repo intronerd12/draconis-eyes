@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import SystemStatus from '../components/SystemStatus'
+import { BRAND_NAME } from '../config/brand'
 import '../App.css'
 
 function Home() {
@@ -10,7 +11,7 @@ function Home() {
   useEffect(() => {
     const userStr = localStorage.getItem('user')
     if (!userStr) {
-      navigate('/')
+      navigate('/login')
       return
     }
     
@@ -21,7 +22,7 @@ function Home() {
       }
     } catch {
       localStorage.removeItem('user')
-      navigate('/')
+      navigate('/login')
     }
   }, [navigate])
 
@@ -281,9 +282,9 @@ function Home() {
       <header>
         <div className="container-pro">
           <div className="logo-section">
-            <span className="logo-icon">🐲</span>
+            <span className="logo-icon">🌴</span>
             <span className="logo-text">
-              Intelligent Dragon Fruit
+              {BRAND_NAME}
             </span>
           </div>
           <nav>
@@ -330,7 +331,7 @@ function Home() {
             <div className="hero-content">
               <div className="hero-left">
                 <div className="hero-badge">
-                  Intelligent Dragon Fruit Ripeness &amp; Quality Detection System
+                  {BRAND_NAME} • Ripeness &amp; Quality Detection
                 </div>
                 <h1 className="hero-title">
                   AI-powered
@@ -868,7 +869,7 @@ function Home() {
 
       <footer>
         <div className="container-pro">
-          <div className="footer-logo">🐲 Dragon Vision</div>
+          <div className="footer-logo">🌴 {BRAND_NAME}</div>
           <p>
             Intelligent Dragon Fruit Ripeness &amp; Quality Detection System.
             Built for packing houses, exporters, and precision agriculture teams.
@@ -879,7 +880,7 @@ function Home() {
             <a href="#shop">Batches</a>
           </div>
           <div className="footer-copyright">
-            © {new Date().getFullYear()} Dragon Vision. All rights reserved.
+            © {new Date().getFullYear()} {BRAND_NAME}. All rights reserved.
           </div>
         </div>
       </footer>

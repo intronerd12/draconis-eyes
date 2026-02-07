@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['dragon-fruit']
+
+roboflow:
+  workspace: tropiscan
+  project: dragon-fruit-npevc-cqwwr
+  version: 1
+  license: CC BY 4.0
+  url: https://app.roboflow.com/tropiscan/dragon-fruit-npevc-cqwwr/1

@@ -1,24 +1,51 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 
 const ProtectedRoute = () => {
-  const userStr = localStorage.getItem('user');
-  const user = userStr ? JSON.parse(userStr) : null;
+  const [state, setState] = useState({ loading: true, allowed: false, redirectTo: '/login' });
 
-  if (!user) {
-    // Not logged in
-    return <Navigate to="/" replace />;
+  const user = useMemo(() => {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return null;
+    try {
+      return JSON.parse(userStr);
+    } catch {
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const check = async () => {
+      if (!user) {
+        if (!cancelled) setState({ loading: false, allowed: false, redirectTo: '/login' });
+        return;
+      }
+
+      if (user.role !== 'admin') {
+        if (!cancelled) setState({ loading: false, allowed: false, redirectTo: '/home' });
+        return;
+      }
+
+      if (!cancelled) setState({ loading: false, allowed: true, redirectTo: '/' });
+    };
+
+    check();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  if (state.loading) {
+    return (
+      <div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center', color: 'var(--gray-600)' }}>
+        Checking access…
+      </div>
+    );
   }
 
-  if (user.role !== 'admin') {
-    // Logged in but not admin
-    // We can show a toast here, but side-effects in render are tricky. 
-    // Usually better to let the effect run or just redirect.
-    // For simplicity and safety, we'll just redirect to home.
-    return <Navigate to="/home" replace />;
-  }
-
-  // Authorized
+  if (!state.allowed) return <Navigate to={state.redirectTo} replace />;
   return <Outlet />;
 };
 

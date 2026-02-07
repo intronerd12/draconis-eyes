@@ -2,10 +2,20 @@ from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from PIL import Image
+import base64
 import io
+import json
+import os
 import random
 import uuid
 from datetime import datetime, timezone
+import numpy as np
+
+try:
+    from yolo_runtime import get_yolo_runtime, detections_to_mask
+except Exception:
+    get_yolo_runtime = None
+    detections_to_mask = None
 
 app = FastAPI(title="Dragon Fruit Quality Detection System")
 
@@ -20,6 +30,291 @@ app.add_middleware(
 ANALYSIS_HISTORY = []
 MAX_HISTORY = 20
 LABELED_CORRECTIONS = []
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+MODEL_DIR = os.path.join(os.path.dirname(__file__), "ml_models")
+LABELS_JSONL_PATH = os.path.join(DATA_DIR, "labels.jsonl")
+SCANS_JSONL_PATH = os.path.join(DATA_DIR, "scans.jsonl")
+PRICE_MODEL_PATH = os.path.join(MODEL_DIR, "price_model.json")
+DEFAULT_CURRENCY = "PHP"
+TRAINING_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "training_uploads", "images")
+
+
+def _ensure_dirs():
+    os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(MODEL_DIR, exist_ok=True)
+    os.makedirs(TRAINING_UPLOAD_DIR, exist_ok=True)
+
+
+def _append_jsonl(path: str, payload: dict):
+    _ensure_dirs()
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+
+def _read_jsonl(path: str) -> list[dict]:
+    if not os.path.exists(path):
+        return []
+    items = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                items.append(json.loads(line))
+            except Exception:
+                continue
+    return items
+
+
+def _grade_num(grade: str | None) -> float:
+    g = (grade or "").upper()
+    if g == "A":
+        return 3.0
+    if g == "B":
+        return 2.0
+    if g == "C":
+        return 1.0
+    return 0.0
+
+
+def _size_num(size_category: str | None) -> float:
+    s = (size_category or "").lower()
+    if s == "large":
+        return 3.0
+    if s == "medium":
+        return 2.0
+    if s == "small":
+        return 1.0
+    return 0.0
+
+
+def _ridge_fit(X: np.ndarray, y: np.ndarray, lam: float) -> np.ndarray:
+    n_features = X.shape[1]
+    reg = np.eye(n_features, dtype=float) * float(lam)
+    reg[0, 0] = 0.0
+    XtX = X.T @ X
+    Xty = X.T @ y
+    return np.linalg.solve(XtX + reg, Xty)
+
+
+def _ridge_predict(X: np.ndarray, coef: np.ndarray) -> np.ndarray:
+    return X @ coef
+
+
+def _load_price_model() -> dict:
+    _ensure_dirs()
+    if os.path.exists(PRICE_MODEL_PATH):
+        try:
+            with open(PRICE_MODEL_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict) and "coef" in data and "feature_names" in data:
+                return data
+        except Exception:
+            pass
+
+    return {
+        "type": "ridge_linear",
+        "target": "price_per_kg",
+        "currency": DEFAULT_CURRENCY,
+        "feature_names": [
+            "intercept",
+            "quality_score",
+            "ripeness_score",
+            "defect_probability",
+            "fruit_area_ratio",
+            "color_score",
+            "grade_num",
+            "size_num",
+        ],
+        "coef": [180.0, 0.9, 0.3, -6.0, 120.0, 15.0, 12.0, 8.0],
+        "lambda": 1.0,
+        "n_samples": 0,
+        "metrics": {},
+        "trained_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+PRICE_MODEL = _load_price_model()
+
+
+def _price_features(features: dict) -> list[float]:
+    return [
+        1.0,
+        float(features.get("quality_score") or 0.0),
+        float(features.get("ripeness_score") or 0.0),
+        float(features.get("defect_probability") or 0.0),
+        float(features.get("fruit_area_ratio") or 0.0),
+        float(features.get("color_score") or 0.0),
+        float(features.get("grade_num") or 0.0),
+        float(features.get("size_num") or 0.0),
+    ]
+
+
+def _predict_price_per_kg(features: dict) -> float:
+    coef = PRICE_MODEL.get("coef") or []
+    if not isinstance(coef, list) or not coef:
+        return 0.0
+    x = np.array(_price_features(features), dtype=float)
+    c = np.array(coef, dtype=float)
+    if x.shape[0] != c.shape[0]:
+        return 0.0
+    return float(x @ c)
+
+
+def _retrain_price_model() -> dict | None:
+    rows = _read_jsonl(LABELS_JSONL_PATH)
+    train = []
+    for r in rows:
+        price = r.get("correct_price_per_kg")
+        feats = r.get("features")
+        currency = r.get("currency")
+        if price is None or feats is None:
+            continue
+        if currency and str(currency).upper() != DEFAULT_CURRENCY:
+            continue
+        train.append((feats, float(price)))
+
+    if len(train) < 5:
+        return None
+
+    X = np.array([_price_features(feats) for feats, _ in train], dtype=float)
+    y = np.array([p for _, p in train], dtype=float)
+    lam = float(PRICE_MODEL.get("lambda") or 1.0)
+    coef = _ridge_fit(X, y, lam)
+    pred = _ridge_predict(X, coef)
+    mae = float(np.mean(np.abs(pred - y)))
+
+    updated = {
+        **PRICE_MODEL,
+        "coef": [float(v) for v in coef.tolist()],
+        "n_samples": int(len(train)),
+        "metrics": {"mae": mae},
+        "trained_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    _ensure_dirs()
+    with open(PRICE_MODEL_PATH, "w", encoding="utf-8") as f:
+        json.dump(updated, f, ensure_ascii=False, indent=2)
+
+    return updated
+
+
+def _segmentation_mask_from_colors(masks: list[np.ndarray]) -> np.ndarray:
+    if not masks:
+        return np.zeros((1, 1), dtype=bool)
+    mask = np.zeros_like(masks[0], dtype=bool)
+    for m in masks:
+        mask |= m.astype(bool)
+    if mask.size == 0:
+        return mask
+
+    for _ in range(2):
+        p = np.pad(mask.astype(np.uint8), 1, mode="edge")
+        s = (
+            p[0:-2, 0:-2]
+            + p[0:-2, 1:-1]
+            + p[0:-2, 2:]
+            + p[1:-1, 0:-2]
+            + p[1:-1, 1:-1]
+            + p[1:-1, 2:]
+            + p[2:, 0:-2]
+            + p[2:, 1:-1]
+            + p[2:, 2:]
+        )
+        mask = s >= 4
+    return mask
+
+
+def _mask_bbox(mask: np.ndarray, width: int, height: int) -> tuple[int, int, int, int]:
+    ys, xs = np.where(mask)
+    if len(xs) == 0 or len(ys) == 0:
+        return (0, 0, width - 1, height - 1)
+    x0 = int(xs.min())
+    x1 = int(xs.max())
+    y0 = int(ys.min())
+    y1 = int(ys.max())
+    return (x0, y0, x1, y1)
+
+
+def _segmentation_preview_base64(image: Image.Image, mask: np.ndarray, bbox: tuple[int, int, int, int]) -> str | None:
+    try:
+        preview = image.copy().convert("RGBA")
+        arr = np.array(preview)
+        alpha = np.zeros((arr.shape[0], arr.shape[1]), dtype=np.uint8)
+        alpha[mask] = 90
+        overlay = np.zeros_like(arr)
+        overlay[..., 0] = 230
+        overlay[..., 1] = 0
+        overlay[..., 2] = 92
+        overlay[..., 3] = alpha
+        blended = Image.alpha_composite(Image.fromarray(arr), Image.fromarray(overlay))
+
+        x0, y0, x1, y1 = bbox
+        x0 = max(0, min(x0, blended.size[0] - 1))
+        x1 = max(0, min(x1, blended.size[0] - 1))
+        y0 = max(0, min(y0, blended.size[1] - 1))
+        y1 = max(0, min(y1, blended.size[1] - 1))
+
+        border = blended.load()
+        for x in range(x0, x1 + 1):
+            if 0 <= y0 < blended.size[1]:
+                border[x, y0] = (255, 255, 255, 220)
+            if 0 <= y1 < blended.size[1]:
+                border[x, y1] = (255, 255, 255, 220)
+        for y in range(y0, y1 + 1):
+            if 0 <= x0 < blended.size[0]:
+                border[x0, y] = (255, 255, 255, 220)
+            if 0 <= x1 < blended.size[0]:
+                border[x1, y] = (255, 255, 255, 220)
+
+        max_w = 720
+        if blended.size[0] > max_w:
+            ratio = max_w / blended.size[0]
+            blended = blended.resize((max_w, int(blended.size[1] * ratio)))
+
+        buf = io.BytesIO()
+        blended.convert("RGB").save(buf, format="JPEG", quality=82)
+        return base64.b64encode(buf.getvalue()).decode("ascii")
+    except Exception:
+        return None
+
+
+def _recommendations(ripeness_score: float, defect_level: str, size_category: str, market_value_label: str) -> list[str]:
+    tips: list[str] = []
+    if market_value_label == "Rejected":
+        tips.append("Rescan with the fruit centered and well-lit.")
+        tips.append("Remove background clutter and avoid glare.")
+        return tips
+
+    if defect_level == "high":
+        tips.append("Separate this fruit from the rest of the batch to prevent spread.")
+        tips.append("Inspect for soft spots and odor; discard if leaking or moldy.")
+        tips.append("Sanitize crates and sorting surface after handling.")
+    elif defect_level == "medium":
+        tips.append("Prioritize selling or processing sooner; monitor for fast spoilage.")
+        tips.append("Handle gently to avoid bruising and worsening spots.")
+    else:
+        tips.append("Store in a cool, dry place with airflow to maintain quality.")
+
+    if ripeness_score >= 95:
+        tips.append("Sell/consume within 24 hours for best quality.")
+    elif ripeness_score >= 85:
+        tips.append("Sell/consume within 2–3 days; avoid stacking pressure.")
+    else:
+        tips.append("Allow ripening at room temperature; check daily for color change.")
+
+    if size_category == "Large":
+        tips.append("Use premium packaging to reduce handling damage during transport.")
+
+    if market_value_label == "Premium":
+        tips.append("Allocate to premium/export lane and keep a consistent temperature chain.")
+    elif market_value_label == "Standard":
+        tips.append("Allocate to local market lane; maintain clean sorting and ventilation.")
+    else:
+        tips.append("Allocate to processing lane; remove defects before slicing.")
+
+    return tips
 
 
 @app.get("/")
@@ -32,6 +327,35 @@ def health_check():
     return {"status": "healthy"}
 
 
+@app.post("/train/upload")
+async def train_upload(file: UploadFile = File(...), source: str | None = Form(None)):
+    _ensure_dirs()
+    contents = await file.read()
+    ext = (file.filename or "").rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "jpg"
+    if ext not in ("jpg", "jpeg", "png", "webp"):
+        ext = "jpg"
+    image_id = str(uuid.uuid4())
+    name = f"{image_id}.{ext}"
+    path = os.path.join(TRAINING_UPLOAD_DIR, name)
+    with open(path, "wb") as f:
+        f.write(contents)
+    _append_jsonl(
+        os.path.join(DATA_DIR, "uploads.jsonl"),
+        {"id": image_id, "timestamp": datetime.now(timezone.utc).isoformat(), "filename": name, "source": source},
+    )
+    return {"status": "ok", "id": image_id, "filename": name}
+
+
+@app.get("/train/pending")
+def train_pending():
+    _ensure_dirs()
+    try:
+        count = len([p for p in os.listdir(TRAINING_UPLOAD_DIR) if os.path.isfile(os.path.join(TRAINING_UPLOAD_DIR, p))])
+    except Exception:
+        count = 0
+    return {"pending_images": count}
+
+
 @app.post("/detect")
 async def detect_quality(
     file: UploadFile = File(...),
@@ -41,57 +365,232 @@ async def detect_quality(
 ):
     try:
         contents = await file.read()
-        image = Image.open(io.BytesIO(contents))
-
-        ripeness_score = random.uniform(70, 99)
-        quality_score = random.uniform(80, 99)
-        defect_probability = random.uniform(0, 10)
-
+        image = Image.open(io.BytesIO(contents)).convert('RGB')
+        
+        # Real Heuristic Analysis (Non-Mock)
+        # 1. Image Properties
         width, height = image.size
         area = width * height
-        if area < 300 * 300:
+        
+        # 2. Color Analysis for Ripeness
+        # Convert to numpy array for fast processing
+        img_array = np.array(image)
+
+        yolo_runtime = get_yolo_runtime() if callable(get_yolo_runtime) else None
+        yolo_detections = []
+        yolo_mask = None
+        if yolo_runtime:
+            try:
+                dets = yolo_runtime.predict(image, conf=0.35)
+                yolo_detections = [
+                    {
+                        "x0": d.x0,
+                        "y0": d.y0,
+                        "x1": d.x1,
+                        "y1": d.y1,
+                        "conf": round(float(d.conf), 4),
+                        "cls": int(d.cls),
+                        "name": d.name,
+                    }
+                    for d in dets
+                ]
+                if dets and callable(detections_to_mask):
+                    yolo_mask = detections_to_mask(dets, width, height)
+            except Exception:
+                yolo_detections = []
+                yolo_mask = None
+        
+        # --- DRAGON FRUIT VERIFICATION LOGIC ---
+        # Heuristic: Check if image contains significant Dragon Fruit colors (Pink, Red, Yellow, Green)
+        # R, G, B channels
+        R = img_array[:, :, 0]
+        G = img_array[:, :, 1]
+        B = img_array[:, :, 2]
+
+        # Pink/Red (Skin): Red dominant, Green low
+        mask_pink_red = (R > G * 1.2) & (R > B * 0.8) & (R > 50)
+        
+        # Yellow (Yellow Pitaya): Red + Green high, Blue low
+        mask_yellow = (R > 100) & (G > 100) & (B < 100)
+        
+        # Green (Wings/Scales): Green dominant
+        mask_green = (G > R * 1.05) & (G > B * 1.05) & (G > 40)
+        
+        # White (Flesh): High brightness, low saturation (R~G~B > 150)
+        mask_white = (R > 150) & (G > 150) & (B > 150) & (np.abs(R - G) < 30) & (np.abs(G - B) < 30)
+
+        # Count pixels
+        dragon_fruit_pixels = np.sum(mask_pink_red | mask_yellow | mask_green | mask_white)
+        total_pixels = width * height
+        relevance_ratio = dragon_fruit_pixels / total_pixels
+        
+        is_valid_fruit = True
+        warning_message = None
+        
+        # Threshold: At least 15% of the image should be relevant colors
+        if (not yolo_detections) and relevance_ratio < 0.15:
+            is_valid_fruit = False
+            warning_message = "Warning: The picture is not a dragon fruit. Please make sure to picture a dragon fruit in a professional made and styled."
+            grade = "N/A"
+            fruit_type = "Unknown Object"
+        
+        color_union = mask_pink_red | mask_yellow | mask_green | mask_white
+        if yolo_mask is not None and yolo_mask.shape == color_union.shape:
+            inter = yolo_mask & color_union
+            seg_mask = inter if int(np.sum(inter)) > 0 else yolo_mask.astype(bool)
+        else:
+            seg_mask = _segmentation_mask_from_colors([mask_pink_red, mask_yellow, mask_green, mask_white])
+        fruit_area_pixels = int(np.sum(seg_mask))
+        fruit_area_ratio = float(fruit_area_pixels / max(1, total_pixels))
+        bbox = _mask_bbox(seg_mask, width, height)
+        preview_b64 = _segmentation_preview_base64(image, seg_mask, bbox)
+
+        masked = img_array[seg_mask] if fruit_area_pixels > 0 else img_array.reshape(-1, 3)
+        avg_color = masked.mean(axis=0) if masked.size else img_array.mean(axis=(0, 1))
+        r, g, b = [float(v) for v in avg_color.tolist()]
+        
+        # Ripeness Heuristic: Dragon fruit turns from Green to Pink/Red
+        # Normalized Redness Index = (R - G) / (R + G)
+        # If Green > Red, it's unripe (negative index)
+        # If Red > Green, it's ripe (positive index)
+        
+        total_intensity = r + g + b + 0.1 # Avoid div by zero
+        redness_ratio = r / total_intensity
+        greenness_ratio = g / total_intensity
+        
+        # Ripeness Score (0-100)
+        # Assume ideal ripe is mostly red/pink (High R, Mod B, Low G)
+        # Unripe is High G
+        
+        if greenness_ratio > redness_ratio:
+            # Unripe
+            ripeness_score = max(10, 50 - (greenness_ratio * 100))
+            fruit_status = "Unripe"
+        else:
+            # Ripe
+            ripeness_score = min(99, 60 + (redness_ratio * 100))
+            fruit_status = "Ripe"
+            
+        # 3. Quality Score based on Brightness/Vibrancy
+        brightness = (r + g + b) / 3
+        quality_score = min(98, (brightness / 255) * 100 + 40) # Simple heuristic
+        
+        # 4. Defect Detection (Simple Blob/Contrast)
+        # Convert to grayscale
+        gray = np.mean(img_array, axis=2)
+        # Defects are often dark spots. Calculate variance or percentage of dark pixels
+        dark_pixels = np.sum(gray < 50) # Threshold for dark spots
+        total_pixels = width * height
+        defect_ratio = (dark_pixels / total_pixels) * 100
+        
+        defect_probability = min(90, defect_ratio * 10) # Amplify ratio
+        
+        if fruit_area_ratio < 0.12:
             size_category = "Small"
-        elif area < 800 * 800:
+        elif fruit_area_ratio < 0.26:
             size_category = "Medium"
         else:
             size_category = "Large"
 
-        if defect_probability >= 7 or ripeness_score >= 96:
+        weight_grams = int(round(np.clip(200.0 + 1650.0 * fruit_area_ratio, 180.0, 900.0)))
+            
+        # Identification (Placeholder for species, can't reliably detect species without ML)
+        fruit_types = ["Pink (Hylocereus undatus)", "White (Hylocereus undatus)", "Yellow (Selenicereus megalanthus)"]
+        fruit_type = fruit_types[0] # Default to most common
+        
+        # Shape Analysis
+        aspect_ratio = max(width, height) / min(width, height)
+        if 1.0 <= aspect_ratio <= 1.2:
+            shape_quality = "Perfectly Oval"
+            shape_score = 10
+        elif 1.2 < aspect_ratio <= 1.4:
+            shape_quality = "Slightly Irregular"
+            shape_score = 8
+        else:
+            shape_quality = "Irregular/Deformed"
+            shape_score = 5
+
+        # Wings Analysis based on ripeness
+        if ripeness_score < 50:
+            wings_condition = "Green & Firm"
+        elif ripeness_score < 85:
+            wings_condition = "Green with Red Tips"
+        else:
+            wings_condition = "Red/Pink & Soft"
+
+        # Disease/Defect Logic
+        if defect_probability < 3:
+            defect_level = "low"
+            disease_status = "Healthy"
+        elif defect_probability < 7:
+            defect_level = "medium"
+            disease_status = "Minor Spotting"
+        else:
+            defect_level = "high"
+            disease_status = "Potential Rot/Fungal Infection"
+
+        # Shelf Life Logic
+        if defect_probability >= 7 or ripeness_score >= 95:
             shelf_life_days = 1
             shelf_life_label = "Consume immediately"
-        elif defect_probability >= 5 or ripeness_score >= 92:
-            shelf_life_days = 2
-            shelf_life_label = "1–2 days"
         elif defect_probability >= 3 or ripeness_score >= 85:
             shelf_life_days = 3
             shelf_life_label = "2–3 days"
         else:
-            shelf_life_days = 4
-            shelf_life_label = "3–4 days"
+            shelf_life_days = 5
+            shelf_life_label = "4–5 days"
 
-        if quality_score > 90 and defect_probability < 4 and size_category != "Small":
+        # Grading
+        if not is_valid_fruit:
+            grade = "N/A"
+            base_price = 0.0
+        elif quality_score > 85 and defect_probability < 4 and size_category != "Small":
             grade = "A"
-        elif quality_score > 80 and defect_probability < 7:
+            base_price = 250.0
+        elif quality_score > 70 and defect_probability < 8:
             grade = "B"
+            base_price = 180.0
         else:
             grade = "C"
+            base_price = 120.0
+            
+        color_score = float(np.clip((redness_ratio - greenness_ratio) * 10.0 + 3.5, 0.0, 10.0))
+        features = {
+            "quality_score": float(round(quality_score, 3)),
+            "ripeness_score": float(round(ripeness_score, 3)),
+            "defect_probability": float(round(defect_probability, 3)),
+            "fruit_area_ratio": float(round(fruit_area_ratio, 6)),
+            "color_score": float(round(color_score, 4)),
+            "grade_num": _grade_num(grade),
+            "size_num": _size_num(size_category),
+        }
 
-        if defect_probability < 3:
-            defect_level = "low"
-        elif defect_probability < 7:
-            defect_level = "medium"
+        if is_valid_fruit:
+            model_price = _predict_price_per_kg(features)
+            if model_price <= 0:
+                model_price = base_price - (defect_probability * 3.0)
+            estimated_price_per_kg = float(max(0.0, model_price))
         else:
-            defect_level = "high"
+            estimated_price_per_kg = 0.0
 
-        regions = []
-        for area_name in ["top-left", "top-right", "bottom-left", "bottom-right"]:
-            severity = max(0.0, min(1.0, random.uniform(defect_probability / 20, defect_probability / 8 + 0.05)))
-            regions.append(
-                {
-                    "area": area_name,
-                    "severity": severity,
-                }
-            )
+        if not is_valid_fruit:
+            market_value_label = "Rejected"
+            market_value_score = 0
+            sorting_lane = "Rejected"
+        elif grade == "A":
+            market_value_label = "Premium"
+            market_value_score = 92 if defect_level == "low" else 85
+            sorting_lane = "Export / Premium"
+        elif grade == "B":
+            market_value_label = "Standard"
+            market_value_score = 75 if defect_level != "high" else 62
+            sorting_lane = "Local Market"
+        else:
+            market_value_label = "Processing"
+            market_value_score = 55 if defect_level != "high" else 35
+            sorting_lane = "Processing / Reject check"
+
+        recommendations = _recommendations(ripeness_score, defect_level, size_category, market_value_label)
 
         result = {
             "id": str(uuid.uuid4()),
@@ -101,26 +600,64 @@ async def detect_quality(
             "lon": lon,
             "width": width,
             "height": height,
-            "size_category": size_category,
-            "ripeness_score": ripeness_score,
-            "quality_score": quality_score,
-            "defect_probability": defect_probability,
+            "fruit_type": fruit_type,
             "grade": grade,
+            "is_valid_fruit": is_valid_fruit,
+            "warning_message": warning_message,
+            "size_category": size_category,
+            "weight_grams_est": weight_grams,
+            "ripeness_score": round(ripeness_score, 1),
+            "quality_score": round(quality_score, 1),
+            "defect_probability": round(defect_probability, 1),
+            "shape_quality": shape_quality,
+            "wings_condition": wings_condition,
+            "disease_status": disease_status,
             "defect_level": defect_level,
+            "defect_regions": [], # Skipping detailed region mapping for heuristic
             "shelf_life_days": shelf_life_days,
             "shelf_life_label": shelf_life_label,
-            "defect_regions": regions,
-            "notes": "Automated analysis complete.",
-            "color_analysis": "Vibrant Pink",
-            "surface_quality": "Smooth, minimal scarring",
-            "size_classification": size_category,
-            "ripeness_level": "Ready to eat",
-            "defect_description": "None detected",
+            "fruit_area_ratio": round(fruit_area_ratio, 6),
+            "segmentation_bbox": {"x0": bbox[0], "y0": bbox[1], "x1": bbox[2], "y1": bbox[3]},
+            "segmentation_preview_base64": preview_b64,
+            "market_value_label": market_value_label,
+            "market_value_score": market_value_score,
+            "sorting_lane": sorting_lane,
+            "estimated_price_per_kg": round(estimated_price_per_kg, 2),
+            "currency": DEFAULT_CURRENCY,
+            "detections": yolo_detections,
+            "detection_backend": "yolo" if yolo_detections else "heuristic",
+            "price_model": {
+                "type": PRICE_MODEL.get("type"),
+                "n_samples": PRICE_MODEL.get("n_samples"),
+                "trained_at": PRICE_MODEL.get("trained_at"),
+                "mae": (PRICE_MODEL.get("metrics") or {}).get("mae"),
+            },
+            "recommendations": recommendations,
+            "notes": f"Grade {grade} {fruit_type}. {wings_condition}.",
+            "color_analysis": {"r": int(round(r)), "g": int(round(g)), "b": int(round(b)), "score": round(color_score, 2)},
+            "defect_description": disease_status,
         }
 
         ANALYSIS_HISTORY.insert(0, result)
         if len(ANALYSIS_HISTORY) > MAX_HISTORY:
             ANALYSIS_HISTORY.pop()
+
+        _append_jsonl(
+            SCANS_JSONL_PATH,
+            {
+                "id": result["id"],
+                "timestamp": result["timestamp"],
+                "features": features,
+                "prediction": {
+                    "grade": result["grade"],
+                    "price_per_kg": result["estimated_price_per_kg"],
+                    "currency": result["currency"],
+                    "weight_grams": result["weight_grams_est"],
+                    "size_category": result["size_category"],
+                    "market_value_label": result["market_value_label"],
+                },
+            },
+        )
 
         return result
 
@@ -210,25 +747,65 @@ def get_batch(batch_id: str):
 
 class LabelPayload(BaseModel):
     analysis_id: str
-    correct_grade: str
+    correct_grade: str | None = None
+    correct_weight_grams: float | None = None
+    correct_price_per_kg: float | None = None
+    currency: str | None = None
 
 
 @app.post("/admin/label")
 def label_scan(payload: LabelPayload):
+    correction = {
+        "analysis_id": payload.analysis_id,
+        "correct_grade": payload.correct_grade,
+        "correct_weight_grams": payload.correct_weight_grams,
+        "correct_price_per_kg": payload.correct_price_per_kg,
+        "currency": (payload.currency or DEFAULT_CURRENCY).upper(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
     LABELED_CORRECTIONS.append(
-        {
-            "analysis_id": payload.analysis_id,
-            "correct_grade": payload.correct_grade,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
+        {k: v for k, v in correction.items() if v is not None}
     )
 
+    matched = None
     for item in ANALYSIS_HISTORY:
         if item["id"] == payload.analysis_id:
-            item["grade"] = payload.correct_grade
+            matched = item
+            if payload.correct_grade:
+                item["grade"] = payload.correct_grade
+            if payload.correct_weight_grams is not None:
+                item["weight_grams_est"] = int(round(float(payload.correct_weight_grams)))
+            if payload.correct_price_per_kg is not None:
+                item["estimated_price_per_kg"] = float(payload.correct_price_per_kg)
+                item["currency"] = (payload.currency or DEFAULT_CURRENCY).upper()
             item["label_corrected"] = True
 
-    return {"status": "ok", "total_labeled": len(LABELED_CORRECTIONS)}
+    if matched:
+        features = {
+            "quality_score": float(matched.get("quality_score") or 0.0),
+            "ripeness_score": float(matched.get("ripeness_score") or 0.0),
+            "defect_probability": float(matched.get("defect_probability") or 0.0),
+            "fruit_area_ratio": float(matched.get("fruit_area_ratio") or 0.0),
+            "color_score": float((matched.get("color_analysis") or {}).get("score") or 0.0),
+            "grade_num": _grade_num(payload.correct_grade or matched.get("grade")),
+            "size_num": _size_num(matched.get("size_category")),
+        }
+        correction["features"] = features
+
+    _append_jsonl(LABELS_JSONL_PATH, {k: v for k, v in correction.items() if v is not None})
+
+    updated_model = None
+    if payload.correct_price_per_kg is not None:
+        updated_model = _retrain_price_model()
+        if updated_model:
+            global PRICE_MODEL
+            PRICE_MODEL = updated_model
+
+    return {
+        "status": "ok",
+        "total_labeled": len(LABELED_CORRECTIONS),
+        "price_model": PRICE_MODEL,
+    }
 
 
 @app.get("/reports/summary")

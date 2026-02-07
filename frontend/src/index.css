@@ -1,10 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --dragon-primary: #e6005c; /* Dragon fruit pink */
-  --dragon-secondary: #00b34d; /* Dragon fruit green */
-  --dragon-flesh: #fce6f2; /* Light pink background */
-  --dragon-accent: #ffeb3b; /* Yellow pitaya accent */
+  /* TropiScan brand tokens */
+  --brand-primary: #e6005c;
+  --brand-secondary: #00b34d;
+  --brand-surface: #fce6f2;
+  --brand-accent: #ffeb3b;
+
+  /* Back-compat tokens (gradually migrate to --brand-*) */
+  --dragon-primary: var(--brand-primary);
+  --dragon-secondary: var(--brand-secondary);
+  --dragon-flesh: var(--brand-surface);
+  --dragon-accent: var(--brand-accent);
   
   --white: #ffffff;
   --gray-50: #f9fafb;
@@ -39,7 +46,6 @@ body {
 button {
   cursor: pointer;
 }
-
 
 
 

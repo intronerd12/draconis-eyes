@@ -1,41 +1,104 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Server, Activity, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { API_BASE_URL } from '../../config/api';
 
 const ApiMonitoring = () => {
+  const [error, setError] = useState('');
+  const [latencyData, setLatencyData] = useState([]);
+  const [checks, setChecks] = useState({ total: 0, failures: 0 });
+  const [components, setComponents] = useState({});
+
+  const avgLatency = useMemo(() => {
+    if (!latencyData.length) return null;
+    const sum = latencyData.reduce((a, b) => a + (b.ms || 0), 0);
+    return Math.round(sum / latencyData.length);
+  }, [latencyData]);
+
+  const errorRate = useMemo(() => {
+    if (!checks.total) return null;
+    return (checks.failures / checks.total) * 100;
+  }, [checks]);
+
+  const uptime = useMemo(() => {
+    if (!checks.total) return null;
+    return ((checks.total - checks.failures) / checks.total) * 100;
+  }, [checks]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    // Fetch API status from our backend
+    const tick = async () => {
+      setError('');
+      const start = performance.now();
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/health`);
+        const latencyMs = Math.round(performance.now() - start);
+        const body = await res.json().catch(() => null);
+
+        const ok = res.ok && body?.status === 'ok';
+        const time = new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+        if (!cancelled) {
+          setLatencyData((prev) => {
+            const next = [...prev, { time, ms: latencyMs, ok }];
+            return next.length > 60 ? next.slice(next.length - 60) : next;
+          });
+          setChecks((prev) => ({ total: prev.total + 1, failures: prev.failures + (ok ? 0 : 1) }));
+          setComponents(body?.components || {});
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e?.message || 'Status check failed');
+          const time = new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+          setLatencyData((prev) => {
+            const next = [...prev, { time, ms: 0, ok: false }];
+            return next.length > 60 ? next.slice(next.length - 60) : next;
+          });
+          setChecks((prev) => ({ total: prev.total + 1, failures: prev.failures + 1 }));
+        }
+      }
+    };
+
+    tick();
+    const interval = setInterval(tick, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
   const apiStats = [
-    { title: 'Total Requests', value: '1.2M', change: '+12%', icon: <Server size={24} color="#3b82f6" /> },
-    { title: 'Avg Latency', value: '45ms', change: '-5%', icon: <Clock size={24} color="#10b981" /> },
-    { title: 'Error Rate', value: '0.02%', change: '0%', icon: <AlertTriangle size={24} color="#ef4444" /> },
-    { title: 'Uptime', value: '99.99%', change: '0%', icon: <Activity size={24} color="#8b5cf6" /> },
+    { title: 'Checks (Session)', value: checks.total.toLocaleString(), change: 'live', icon: <Server size={24} color="#3b82f6" /> },
+    { title: 'Avg Latency', value: avgLatency === null ? '—' : `${avgLatency}ms`, change: 'live', icon: <Clock size={24} color="#10b981" /> },
+    { title: 'Error Rate', value: errorRate === null ? '—' : `${errorRate.toFixed(2)}%`, change: 'live', icon: <AlertTriangle size={24} color="#ef4444" /> },
+    { title: 'Uptime', value: uptime === null ? '—' : `${uptime.toFixed(2)}%`, change: 'live', icon: <Activity size={24} color="#8b5cf6" /> },
   ];
 
-  const latencyData = [
-    { time: '10:00', ms: 45 },
-    { time: '10:05', ms: 48 },
-    { time: '10:10', ms: 42 },
-    { time: '10:15', ms: 55 },
-    { time: '10:20', ms: 50 },
-    { time: '10:25', ms: 46 },
-    { time: '10:30', ms: 44 },
-    { time: '10:35', ms: 45 },
-    { time: '10:40', ms: 47 },
-    { time: '10:45', ms: 43 },
-    { time: '10:50', ms: 49 },
-    { time: '10:55', ms: 45 },
-  ];
-
-  const endpoints = [
-    { method: 'GET', path: '/api/v1/scans', status: 'Operational', latency: '42ms' },
-    { method: 'POST', path: '/api/v1/scans', status: 'Operational', latency: '65ms' },
-    { method: 'GET', path: '/api/v1/users', status: 'Operational', latency: '35ms' },
-    { method: 'POST', path: '/api/v1/auth/login', status: 'Operational', latency: '55ms' },
-    { method: 'GET', path: '/api/v1/stats', status: 'Operational', latency: '120ms' },
-  ];
+  const endpoints = Object.entries(components).map(([name, ok]) => ({
+    method: 'CHECK',
+    path: name,
+    status: ok ? 'Operational' : 'Down',
+    latency: ok ? '—' : '—',
+    ok,
+  }));
 
   return (
     <div>
       <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '25px', color: 'var(--gray-800)' }}>API Monitoring</h1>
+
+      {error ? (
+        <div style={{ marginBottom: '20px', backgroundColor: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412', padding: '14px 16px', borderRadius: '12px' }}>
+          {error}
+        </div>
+      ) : null}
+
+      <div style={{ marginBottom: '18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ color: 'var(--gray-600)', fontWeight: 600 }}>
+          Polling <span style={{ color: 'var(--gray-900)' }}>{API_BASE_URL}</span>/status every 30s
+        </div>
+      </div>
 
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '30px' }}>
@@ -77,7 +140,7 @@ const ApiMonitoring = () => {
         <div style={{ backgroundColor: 'white', padding: '25px', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '20px', color: 'var(--gray-800)' }}>Endpoint Status</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            {endpoints.map((ep, index) => (
+            {endpoints.length ? endpoints.map((ep, index) => (
               <div key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: index < endpoints.length - 1 ? '1px solid var(--gray-100)' : 'none' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -96,10 +159,12 @@ const ApiMonitoring = () => {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '0.85rem', color: 'var(--gray-500)' }}>{ep.latency}</span>
-                  <CheckCircle size={16} color="#10b981" />
+                  {ep.ok ? <CheckCircle size={16} color="#10b981" /> : <AlertTriangle size={16} color="#ef4444" />}
                 </div>
               </div>
-            ))}
+            )) : (
+              <div style={{ color: 'var(--gray-500)' }}>No component data yet.</div>
+            )}
           </div>
         </div>
 

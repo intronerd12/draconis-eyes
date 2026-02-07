@@ -8,7 +8,8 @@ const dotenv = require('dotenv');
 // Load env vars
 dotenv.config({ path: './config/.env' });
 
-const connectDatabase = require('./config/database');
+const connectDB = require('./config/db');
+// const sql = require('./config/database');
 const { configureCloudinary } = require('./config/cloudinary');
 const { verifyConnection: verifyEmailConnection } = require('./config/email');
 const User = require('./models/User');
@@ -27,15 +28,19 @@ app.use(express.json());
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/users', require('./routes/userRoutes'));
+app.use('/api/scan', require('./routes/scanRoutes'));
+app.use('/api/weather', require('./routes/weatherRoutes'));
 
 // Connect to Database
-connectDatabase();
+connectDB();
 
 // Configure Cloudinary
 const cloudinary = configureCloudinary();
 
 // Seed Database
 const seedDatabase = async () => {
+  /*
   try {
     const userCount = await User.countDocuments();
     if (userCount === 0) {
@@ -62,20 +67,26 @@ const seedDatabase = async () => {
   } catch (err) {
     console.error('Seeding failed:', err.message);
   }
+  */
+  console.log('Seeding temporarily disabled for migration.');
 };
 
 // Status Endpoint
 app.get('/status', async (req, res) => {
   const status = {
-    mongodb: 'disconnected',
+    database: 'disconnected',
     cloudinary: 'disconnected',
     ai_service: 'disconnected',
     email_service: 'disconnected'
   };
 
-  // Check MongoDB
-  if (mongoose.connection.readyState === 1) {
-    status.mongodb = 'connected';
+  // Check Database
+  try {
+    if (mongoose.connection.readyState === 1) {
+      status.database = 'connected';
+    }
+  } catch (err) {
+    console.error('Database connection error:', err);
   }
 
   // Check Email (Mailtrap)
@@ -110,13 +121,62 @@ app.get('/status', async (req, res) => {
   res.json(status);
 });
 
+app.get('/api/health', async (req, res) => {
+  const status = {
+    database: false,
+    cloudinary: false,
+    ai_service: false,
+    email_service: false,
+  };
+
+  try {
+    status.database = mongoose.connection.readyState === 1;
+  } catch {
+    status.database = false;
+  }
+
+  try {
+    status.email_service = await verifyEmailConnection();
+  } catch {
+    status.email_service = false;
+  }
+
+  if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+    status.cloudinary = true;
+  }
+
+  try {
+    const aiRes = await axios.get(`${PYTHON_SERVICE_URL}/health`);
+    status.ai_service = aiRes?.data?.status === 'healthy';
+  } catch {
+    status.ai_service = false;
+  }
+
+  const allOk = Object.values(status).every(Boolean);
+  res.json({
+    status: allOk ? 'ok' : 'degraded',
+    components: status,
+  });
+});
+
 // Startup Notification
 const logStatus = async () => {
   console.log('\n--- System Status Check ---');
   
-  // MongoDB
-  const mongoStatus = mongoose.connection.readyState === 1 ? '✅ Connected' : '❌ Disconnected';
-  console.log(`MongoDB:      ${mongoStatus}`);
+  // Database
+  let dbStatus = '❌ Disconnected';
+  try {
+      if (mongoose.connection.readyState === 1) {
+        dbStatus = '✅ Connected';
+      } else if (mongoose.connection.readyState === 2) {
+        dbStatus = '⏳ Connecting...';
+      } else {
+        dbStatus = `❌ Disconnected (State: ${mongoose.connection.readyState})`;
+      }
+  } catch (e) {
+      dbStatus = '❌ Error (' + e.message + ')';
+  }
+  console.log(`Database:     ${dbStatus}`);
 
   // Cloudinary
   const cloudStatus = (process.env.CLOUDINARY_CLOUD_NAME) ? '✅ Configured' : '❌ Missing Config';
@@ -132,7 +192,7 @@ const logStatus = async () => {
   console.log('---------------------------\n');
 };
 
-app.listen(PORT, async () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`Node Server running on port ${PORT}`);
   
   // Wait a bit for connections to establish before logging status
