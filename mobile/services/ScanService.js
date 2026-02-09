@@ -2,26 +2,54 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { API_URL } from './api';
 
-const STORAGE_KEY = 'dragon_scans';
-const IMAGES_DIR = FileSystem.documentDirectory + 'scans/';
+import { getUserNamespace, sanitizeForKey } from './storageScope';
+
+const STORAGE_KEY_BASE = 'dragon_scans_v1';
+
+const getStorageKey = (user) => {
+  const ns = sanitizeForKey(getUserNamespace(user));
+  return ns ? `${STORAGE_KEY_BASE}:${ns}` : `${STORAGE_KEY_BASE}:anon`;
+};
+
+const getImagesDir = (user) => {
+  const ns = sanitizeForKey(getUserNamespace(user)) || 'anon';
+  return `${FileSystem.documentDirectory}scans/${ns}/`;
+};
 
 // Ensure directory exists
-const ensureDirExists = async () => {
-  const dirInfo = await FileSystem.getInfoAsync(IMAGES_DIR);
+const ensureDirExists = async (dir) => {
+  const dirInfo = await FileSystem.getInfoAsync(dir);
   if (!dirInfo.exists) {
-    await FileSystem.makeDirectoryAsync(IMAGES_DIR, { intermediates: true });
+    await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
   }
+};
+
+const getUploadMeta = (imageUri) => {
+  const uriStr = String(imageUri || '');
+  const cleanUri = uriStr.split('?')[0];
+  const extRaw = cleanUri.includes('.') ? cleanUri.split('.').pop() : '';
+  const ext = String(extRaw || '').toLowerCase();
+  const mime =
+    ext === 'png'
+      ? 'image/png'
+      : ext === 'webp'
+        ? 'image/webp'
+        : 'image/jpeg';
+  const fileName = ext === 'png' || ext === 'webp' ? `scan.${ext}` : 'scan.jpg';
+  return { mime, fileName };
 };
 
 export const ScanService = {
   // Analyze Image via Backend
   analyzeImage: async (imageUri) => {
     try {
+      const { mime, fileName } = getUploadMeta(imageUri);
+
       const formData = new FormData();
       formData.append('image', {
         uri: imageUri,
-        type: 'image/jpeg',
-        name: 'scan.jpg',
+        type: mime,
+        name: fileName,
       });
 
       console.log('Sending image for analysis...', API_URL);
@@ -46,10 +74,43 @@ export const ScanService = {
     }
   },
 
-  // Get all scans
-  getScans: async () => {
+  uploadTrainingSample: async (imageUri, { source } = {}) => {
     try {
-      const jsonValue = await AsyncStorage.getItem(STORAGE_KEY);
+      const { mime, fileName } = getUploadMeta(imageUri);
+      const formData = new FormData();
+      formData.append('file', {
+        uri: imageUri,
+        type: mime,
+        name: fileName,
+      });
+      if (source) {
+        formData.append('source', String(source));
+      }
+
+      const response = await fetch(`${API_URL}/api/train/upload`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || 'Upload failed');
+      }
+
+      return await response.json();
+    } catch (e) {
+      console.error('Error uploading training sample:', e);
+      throw e;
+    }
+  },
+
+  // Get all scans
+  getScans: async ({ user } = {}) => {
+    try {
+      const jsonValue = await AsyncStorage.getItem(getStorageKey(user));
       return jsonValue != null ? JSON.parse(jsonValue) : [];
     } catch (e) {
       console.error('Error reading scans', e);
@@ -58,20 +119,21 @@ export const ScanService = {
   },
 
   // Add a new scan
-  addScan: async (scan) => {
+  addScan: async (scan, { user } = {}) => {
     try {
-      await ensureDirExists();
+      const imagesDir = getImagesDir(user);
+      await ensureDirExists(imagesDir);
       
       // Move image to permanent storage
       const fileName = `scan_${Date.now()}.jpg`;
-      const newPath = IMAGES_DIR + fileName;
+      const newPath = imagesDir + fileName;
       
       await FileSystem.copyAsync({
         from: scan.imageUri,
         to: newPath
       });
 
-      const currentScans = await ScanService.getScans();
+      const currentScans = await ScanService.getScans({ user });
       const newScan = {
         id: Date.now().toString(),
         timestamp: new Date().toISOString(),
@@ -80,27 +142,27 @@ export const ScanService = {
       };
       
       const updatedScans = [newScan, ...currentScans];
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedScans));
+      await AsyncStorage.setItem(getStorageKey(user), JSON.stringify(updatedScans));
       return newScan;
     } catch (e) {
       console.error('Error adding scan', e);
       // Fallback: save without moving image if FS fails
-      const currentScans = await ScanService.getScans();
+      const currentScans = await ScanService.getScans({ user });
       const newScan = {
         id: Date.now().toString(),
         timestamp: new Date().toISOString(),
         ...scan,
       };
       const updatedScans = [newScan, ...currentScans];
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedScans));
+      await AsyncStorage.setItem(getStorageKey(user), JSON.stringify(updatedScans));
       return newScan;
     }
   },
 
   // Get stats
-  getStats: async () => {
+  getStats: async ({ user } = {}) => {
     try {
-      const scans = await ScanService.getScans();
+      const scans = await ScanService.getScans({ user });
       const total = scans.length;
       if (total === 0) return { total: 0, best: '-', avg: '0%' };
 
@@ -130,9 +192,16 @@ export const ScanService = {
   },
   
   // Clear all scans (for testing/debug)
-  clearScans: async () => {
+  clearScans: async ({ user, deleteImages = false } = {}) => {
     try {
-      await AsyncStorage.removeItem(STORAGE_KEY);
+      await AsyncStorage.removeItem(getStorageKey(user));
+      if (deleteImages) {
+        const dir = getImagesDir(user);
+        const info = await FileSystem.getInfoAsync(dir);
+        if (info.exists) {
+          await FileSystem.deleteAsync(dir, { idempotent: true });
+        }
+      }
     } catch(e) {
       console.error(e);
     }

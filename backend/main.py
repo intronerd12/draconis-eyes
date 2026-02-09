@@ -1,7 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from PIL import Image
+from PIL import Image, ImageOps
 import base64
 import io
 import json
@@ -9,6 +9,7 @@ import os
 import random
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 import numpy as np
 
 try:
@@ -16,6 +17,13 @@ try:
 except Exception:
     get_yolo_runtime = None
     detections_to_mask = None
+
+try:
+    from selftrain.collector import compute_image_quality, save_training_sample, should_collect_sample
+except Exception:
+    compute_image_quality = None
+    save_training_sample = None
+    should_collect_sample = None
 
 app = FastAPI(title="Dragon Fruit Quality Detection System")
 
@@ -27,6 +35,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.on_event("startup")
+def _startup_check():
+    try:
+        rt = get_yolo_runtime() if callable(get_yolo_runtime) else None
+        if rt is not None:
+            print("AI: YOLO self-trained model enabled.")
+        else:
+            print("AI: YOLO model not enabled (missing weights or ultralytics). Using heuristic fallback.")
+    except Exception:
+        print("AI: YOLO model check failed. Using heuristic fallback.")
+
 ANALYSIS_HISTORY = []
 MAX_HISTORY = 20
 LABELED_CORRECTIONS = []
@@ -37,6 +57,9 @@ SCANS_JSONL_PATH = os.path.join(DATA_DIR, "scans.jsonl")
 PRICE_MODEL_PATH = os.path.join(MODEL_DIR, "price_model.json")
 DEFAULT_CURRENCY = "PHP"
 TRAINING_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "training_uploads", "images")
+
+# Active-learning queue (opt-in via env)
+SELFTRAIN_QUEUE_JSONL = os.path.join(DATA_DIR, "selftrain_queue.jsonl")
 
 
 def _ensure_dirs():
@@ -237,6 +260,31 @@ def _mask_bbox(mask: np.ndarray, width: int, height: int) -> tuple[int, int, int
     return (x0, y0, x1, y1)
 
 
+def _bbox_pad(b: tuple[int, int, int, int], width: int, height: int, pad_frac: float = 0.08) -> tuple[int, int, int, int]:
+    x0, y0, x1, y1 = b
+    bw = max(1, x1 - x0)
+    bh = max(1, y1 - y0)
+    pad_x = int(round(bw * float(pad_frac)))
+    pad_y = int(round(bh * float(pad_frac)))
+    x0 = max(0, x0 - pad_x)
+    y0 = max(0, y0 - pad_y)
+    x1 = min(width - 1, x1 + pad_x)
+    y1 = min(height - 1, y1 + pad_y)
+    return (x0, y0, x1, y1)
+
+
+def _bbox_to_mask(b: tuple[int, int, int, int], width: int, height: int) -> np.ndarray:
+    x0, y0, x1, y1 = b
+    x0 = max(0, min(int(x0), width - 1))
+    x1 = max(0, min(int(x1), width - 1))
+    y0 = max(0, min(int(y0), height - 1))
+    y1 = max(0, min(int(y1), height - 1))
+    m = np.zeros((height, width), dtype=bool)
+    if x1 > x0 and y1 > y0:
+        m[y0:y1, x0:x1] = True
+    return m
+
+
 def _segmentation_preview_base64(image: Image.Image, mask: np.ndarray, bbox: tuple[int, int, int, int]) -> str | None:
     try:
         preview = image.copy().convert("RGBA")
@@ -365,7 +413,13 @@ async def detect_quality(
 ):
     try:
         contents = await file.read()
-        image = Image.open(io.BytesIO(contents)).convert('RGB')
+        image = Image.open(io.BytesIO(contents))
+        # Handle phone orientation correctly (common for mobile captures)
+        try:
+            image = ImageOps.exif_transpose(image)
+        except Exception:
+            pass
+        image = image.convert('RGB')
         
         # Real Heuristic Analysis (Non-Mock)
         # 1. Image Properties
@@ -375,6 +429,12 @@ async def detect_quality(
         # 2. Color Analysis for Ripeness
         # Convert to numpy array for fast processing
         img_array = np.array(image)
+        quality_metrics = None
+        if callable(compute_image_quality):
+            try:
+                quality_metrics = compute_image_quality(img_array)
+            except Exception:
+                quality_metrics = None
 
         yolo_runtime = get_yolo_runtime() if callable(get_yolo_runtime) else None
         yolo_detections = []
@@ -399,6 +459,21 @@ async def detect_quality(
             except Exception:
                 yolo_detections = []
                 yolo_mask = None
+
+        # Pick the most reliable detection as the primary fruit region (handles multi-fruit frames).
+        primary_bbox = None
+        if yolo_detections:
+            best = max(yolo_detections, key=lambda d: float(d.get("conf", 0.0)))
+            try:
+                primary_bbox = (
+                    int(best.get("x0", 0)),
+                    int(best.get("y0", 0)),
+                    int(best.get("x1", width - 1)),
+                    int(best.get("y1", height - 1)),
+                )
+                primary_bbox = _bbox_pad(primary_bbox, width, height, pad_frac=0.10)
+            except Exception:
+                primary_bbox = None
         
         # --- DRAGON FRUIT VERIFICATION LOGIC ---
         # Heuristic: Check if image contains significant Dragon Fruit colors (Pink, Red, Yellow, Green)
@@ -435,7 +510,13 @@ async def detect_quality(
             fruit_type = "Unknown Object"
         
         color_union = mask_pink_red | mask_yellow | mask_green | mask_white
-        if yolo_mask is not None and yolo_mask.shape == color_union.shape:
+
+        # Prefer YOLO-guided region when available; intersect with color cues to reduce background.
+        if primary_bbox is not None:
+            bbox_mask = _bbox_to_mask(primary_bbox, width, height)
+            inter = bbox_mask & color_union
+            seg_mask = inter if int(np.sum(inter)) > 0 else bbox_mask
+        elif yolo_mask is not None and yolo_mask.shape == color_union.shape:
             inter = yolo_mask & color_union
             seg_mask = inter if int(np.sum(inter)) > 0 else yolo_mask.astype(bool)
         else:
@@ -476,14 +557,19 @@ async def detect_quality(
         quality_score = min(98, (brightness / 255) * 100 + 40) # Simple heuristic
         
         # 4. Defect Detection (Simple Blob/Contrast)
-        # Convert to grayscale
+        # Convert to grayscale (defects should be computed on the fruit region, not background)
         gray = np.mean(img_array, axis=2)
-        # Defects are often dark spots. Calculate variance or percentage of dark pixels
-        dark_pixels = np.sum(gray < 50) # Threshold for dark spots
-        total_pixels = width * height
-        defect_ratio = (dark_pixels / total_pixels) * 100
-        
-        defect_probability = min(90, defect_ratio * 10) # Amplify ratio
+        gray_roi = gray[seg_mask] if fruit_area_pixels > 0 else gray.reshape(-1)
+        if gray_roi.size:
+            p10 = float(np.percentile(gray_roi, 10))
+            # Adaptive dark threshold: robust to lighting; keep a floor to avoid over-triggering.
+            thr = max(35.0, p10 - 18.0)
+            dark_pixels = int(np.sum(gray_roi < thr))
+            defect_ratio = (dark_pixels / max(1, int(gray_roi.size))) * 100.0
+        else:
+            defect_ratio = 0.0
+
+        defect_probability = float(min(90.0, defect_ratio * 9.0))
         
         if fruit_area_ratio < 0.12:
             size_category = "Small"
@@ -626,6 +712,16 @@ async def detect_quality(
             "currency": DEFAULT_CURRENCY,
             "detections": yolo_detections,
             "detection_backend": "yolo" if yolo_detections else "heuristic",
+            "detection_summary": {
+                "count": int(len(yolo_detections)),
+                "best_conf": (max([float(d.get("conf", 0.0)) for d in yolo_detections]) if yolo_detections else 0.0),
+                "primary_bbox": (
+                    {"x0": int(primary_bbox[0]), "y0": int(primary_bbox[1]), "x1": int(primary_bbox[2]), "y1": int(primary_bbox[3])}
+                    if primary_bbox is not None
+                    else None
+                ),
+            },
+            "image_quality": quality_metrics,
             "price_model": {
                 "type": PRICE_MODEL.get("type"),
                 "n_samples": PRICE_MODEL.get("n_samples"),
@@ -658,6 +754,51 @@ async def detect_quality(
                 },
             },
         )
+
+        # --- Self-training collection (opt-in) ---
+        # Collect hard/uncertain samples for later labeling/pseudo-labeling.
+        if os.environ.get("DRAGON_SELFTRAIN_ENABLED", "0") == "1" and callable(should_collect_sample) and callable(save_training_sample):
+            try:
+                collect, reasons = should_collect_sample(
+                    yolo_detections=yolo_detections,
+                    relevance_ratio=float(relevance_ratio),
+                    quality=quality_metrics,
+                    min_relevance=float(os.environ.get("DRAGON_SELFTRAIN_MIN_RELEVANCE", "0.08")),
+                    conf_low=float(os.environ.get("DRAGON_SELFTRAIN_CONF_LOW", "0.35")),
+                    conf_high=float(os.environ.get("DRAGON_SELFTRAIN_CONF_HIGH", "0.60")),
+                    min_blur=float(os.environ.get("DRAGON_SELFTRAIN_MIN_BLUR", "25.0")),
+                )
+                if collect:
+                    fn = file.filename or "upload.jpg"
+                    ext = fn.rsplit(".", 1)[-1].lower() if "." in fn else "jpg"
+                    save_training_sample(
+                        image_bytes=contents,
+                        ext=ext,
+                        out_root=Path(TRAINING_UPLOAD_DIR),
+                        queue_jsonl=Path(SELFTRAIN_QUEUE_JSONL),
+                        metadata={
+                            "source": "api_detect",
+                            "reasons": reasons,
+                            "batch_id": batch_id,
+                            "lat": lat,
+                            "lon": lon,
+                            "relevance_ratio": float(round(float(relevance_ratio), 6)),
+                            "image_quality": quality_metrics,
+                            "prediction": {
+                                "is_valid_fruit": bool(is_valid_fruit),
+                                "grade": grade,
+                                "ripeness_score": float(round(ripeness_score, 3)),
+                                "quality_score": float(round(quality_score, 3)),
+                                "defect_probability": float(round(defect_probability, 3)),
+                            },
+                            "yolo": {
+                                "detections": yolo_detections,
+                                "weights": os.environ.get("DRAGON_YOLO_WEIGHTS"),
+                            },
+                        },
+                    )
+            except Exception:
+                pass
 
         return result
 

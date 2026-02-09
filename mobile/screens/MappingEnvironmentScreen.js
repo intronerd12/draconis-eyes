@@ -76,7 +76,7 @@ const evaluateSuitability = (data) => {
   };
 };
 
-export default function MappingEnvironmentScreen({ navigation, route }) {
+export default function MappingEnvironmentScreen({ navigation, route, user }) {
   const insets = useSafeAreaInsets();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -87,7 +87,7 @@ export default function MappingEnvironmentScreen({ navigation, route }) {
     setLoading(true);
     setError(null);
     try {
-      const data = await getEnvironmentalReport({ force });
+      const data = await getEnvironmentalReport({ force, user });
       setReport(data);
     } catch (e) {
       const msg = e && typeof e === 'object' && 'message' in e ? e.message : null;

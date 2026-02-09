@@ -3,7 +3,6 @@ import { View, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'reac
 import { Text, Avatar, Surface, Button, Title, Paragraph, Dialog, Portal } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
@@ -34,7 +33,6 @@ export default function UserScreen({ navigation, user, onLogout, onUpdateUser })
   const handleLogoutConfirm = async () => {
     setLogoutVisible(false);
     try {
-      await AsyncStorage.removeItem('user');
       if (onLogout) onLogout();
     } catch (error) {
       console.error('Error logging out:', error);

@@ -6,15 +6,15 @@ import { ScanService } from '../services/ScanService';
 
 const gradeRank = { A: 3, B: 2, C: 1, 'N/A': 0 };
 
-export default function SortingGradingScreen() {
+export default function SortingGradingScreen({ user }) {
   const [scans, setScans] = useState([]);
   const [gradeFilter, setGradeFilter] = useState('All');
   const [sortBy, setSortBy] = useState('newest');
 
   const refresh = useCallback(async () => {
-    const list = await ScanService.getScans();
+    const list = await ScanService.getScans({ user });
     setScans(Array.isArray(list) ? list : []);
-  }, []);
+  }, [user]);
 
   useFocusEffect(
     useCallback(() => {

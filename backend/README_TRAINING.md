@@ -1,8 +1,8 @@
 # Self-Trained Dragonfruit AI (YOLOv8 / YOLOv11)
 
 This backend supports training a self-trained detection model using your **internet datasets**:
-- `Dragon Fruit.yolov8/`
-- `Dragon Fruit.yolov11/`
+- `Dragon Fruit Vignan.v2i.yolov8/`
+- `Dragon Fruit Vignan.v2i.yolov11/`
 
 It can also combine both into one training dataset, then save `backend/ml_models/yolo_best.pt` so the API can automatically use it for scanning.
 
@@ -44,6 +44,11 @@ Train only YOLOv11 dataset:
 python backend/yolo_train.py --dataset yolov11 --model-size s --epochs 120 --imgsz 640 --device cpu --cache --cos-lr
 ```
 
+Fine-tune from an existing checkpoint (recommended once you have a good `yolo_best.pt`):
+```bash
+python backend/yolo_train.py --dataset combined --finetune-from backend/ml_models/yolo_best.pt --epochs 60 --imgsz 640 --device cpu --cos-lr
+```
+
 Outputs:
 - Runs: `backend/ml_models/yolo_runs/<run_name>/`
 - Best weights: `backend/ml_models/yolo_best.pt`
@@ -68,3 +73,7 @@ Then pseudo-label them to make a trainable dataset:
 python backend/selftrain_ingest.py
 ```
 
+Or run the full self-training loop (ingest -> merge -> fine-tune -> eval):
+```bash
+python backend/selftrain_pipeline.py --device cpu
+```

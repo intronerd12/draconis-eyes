@@ -25,6 +25,29 @@ def main():
   model = YOLO(args.weights)
   metrics = model.val(data=args.data, imgsz=int(args.imgsz), device=args.device, verbose=False)
 
+  # Ultralytics Metrics objects differ slightly across versions; extract best-effort numeric fields.
+  numeric: dict[str, float] = {}
+  try:
+    box = getattr(metrics, "box", None)
+    if box is not None:
+      for k in ("map", "map50", "map75", "mp", "mr"):
+        v = getattr(box, k, None)
+        if v is not None:
+          numeric[f"box_{k}"] = float(v)
+  except Exception:
+    pass
+
+  try:
+    speed = getattr(metrics, "speed", None)
+    if isinstance(speed, dict):
+      for k, v in speed.items():
+        try:
+          numeric[f"speed_{k}"] = float(v)
+        except Exception:
+          continue
+  except Exception:
+    pass
+
   out = {
     "evaluated_at": datetime.now(timezone.utc).isoformat(),
     "weights": args.weights,
@@ -32,6 +55,7 @@ def main():
     "imgsz": int(args.imgsz),
     "device": args.device,
     "metrics": str(metrics),
+    "numeric": numeric,
   }
 
   out_path = repo_root / "backend" / "ml_models" / "yolo_eval.json"
@@ -43,4 +67,3 @@ def main():
 
 if __name__ == "__main__":
   main()
-

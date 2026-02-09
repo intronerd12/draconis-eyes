@@ -1,9 +1,21 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 
-const ENV_CACHE_KEY = 'env_cache_v1';
-const ENV_REPORT_CACHE_KEY = 'env_report_cache_v1';
+import { getUserNamespace, sanitizeForKey } from './storageScope';
+
+const ENV_CACHE_KEY_BASE = 'env_cache_v1';
+const ENV_REPORT_CACHE_KEY_BASE = 'env_report_cache_v1';
 const CACHE_TTL_MS = 10 * 60 * 1000;
+
+const getEnvCacheKey = (user) => {
+  const ns = sanitizeForKey(getUserNamespace(user));
+  return ns ? `${ENV_CACHE_KEY_BASE}:${ns}` : `${ENV_CACHE_KEY_BASE}:anon`;
+};
+
+const getEnvReportCacheKey = (user) => {
+  const ns = sanitizeForKey(getUserNamespace(user));
+  return ns ? `${ENV_REPORT_CACHE_KEY_BASE}:${ns}` : `${ENV_REPORT_CACHE_KEY_BASE}:anon`;
+};
 
 const fetchJson = async (url, { signal, headers } = {}) => {
   const res = await fetch(url, { signal, headers });
@@ -157,8 +169,8 @@ const getForecastFromCoords = async ({ latitude, longitude }, { signal } = {}) =
   };
 };
 
-const readCache = async () => {
-  const raw = await AsyncStorage.getItem(ENV_CACHE_KEY);
+const readCache = async ({ user } = {}) => {
+  const raw = await AsyncStorage.getItem(getEnvCacheKey(user));
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
@@ -171,12 +183,12 @@ const readCache = async () => {
   }
 };
 
-export const getCachedEnvironment = async () => {
-  return await readCache();
+export const getCachedEnvironment = async ({ user } = {}) => {
+  return await readCache({ user });
 };
 
-const readReportCache = async () => {
-  const raw = await AsyncStorage.getItem(ENV_REPORT_CACHE_KEY);
+const readReportCache = async ({ user } = {}) => {
+  const raw = await AsyncStorage.getItem(getEnvReportCacheKey(user));
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
@@ -189,25 +201,38 @@ const readReportCache = async () => {
   }
 };
 
-const writeCache = async (payload) => {
+const writeCache = async (payload, { user } = {}) => {
   try {
-    await AsyncStorage.setItem(ENV_CACHE_KEY, JSON.stringify(payload));
+    await AsyncStorage.setItem(getEnvCacheKey(user), JSON.stringify(payload));
   } catch {
     return;
   }
 };
 
-const writeReportCache = async (payload) => {
+const writeReportCache = async (payload, { user } = {}) => {
   try {
-    await AsyncStorage.setItem(ENV_REPORT_CACHE_KEY, JSON.stringify(payload));
+    await AsyncStorage.setItem(getEnvReportCacheKey(user), JSON.stringify(payload));
   } catch {
     return;
   }
 };
 
-export const getEnvironment = async ({ force = false, signal } = {}) => {
+export const clearEnvironmentCaches = async ({ user } = {}) => {
+  try {
+    await AsyncStorage.multiRemove([
+      getEnvCacheKey(user),
+      getEnvReportCacheKey(user),
+      ENV_CACHE_KEY_BASE,
+      ENV_REPORT_CACHE_KEY_BASE,
+    ]);
+  } catch {
+    return;
+  }
+};
+
+export const getEnvironment = async ({ force = false, signal, user } = {}) => {
   if (!force) {
-    const cached = await readCache();
+    const cached = await readCache({ user });
     if (cached) return cached;
   }
 
@@ -225,13 +250,13 @@ export const getEnvironment = async ({ force = false, signal } = {}) => {
     fetchedAt: Date.now(),
   };
 
-  await writeCache(payload);
+  await writeCache(payload, { user });
   return payload;
 };
 
-export const getEnvironmentalReport = async ({ force = false, signal } = {}) => {
+export const getEnvironmentalReport = async ({ force = false, signal, user } = {}) => {
   if (!force) {
-    const cached = await readReportCache();
+    const cached = await readReportCache({ user });
     if (cached) return cached;
   }
 
@@ -248,6 +273,6 @@ export const getEnvironmentalReport = async ({ force = false, signal } = {}) => 
     fetchedAt: Date.now(),
   };
 
-  await writeReportCache(payload);
+  await writeReportCache(payload, { user });
   return payload;
 };

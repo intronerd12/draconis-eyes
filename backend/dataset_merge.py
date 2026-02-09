@@ -46,20 +46,39 @@ def merge_two_yolo_datasets(
   include_test: bool,
   limit_per_split: int | None = None,
 ):
+  return merge_many_yolo_datasets(
+    datasets=[dataset_a, dataset_b],
+    out_dir=out_dir,
+    include_test=include_test,
+    limit_per_split=limit_per_split,
+  )
+
+
+def merge_many_yolo_datasets(
+  datasets: list[Path],
+  out_dir: Path,
+  include_test: bool,
+  limit_per_split: int | None = None,
+):
+  """Merge N YOLO datasets into a single YOLO dataset folder.
+
+  - Datasets are expected to have split/{images,labels}
+  - Uses hardlinks when possible, otherwise copies
+  - Adds dataset-name prefix to avoid filename collisions
+  """
   splits = ["train", "valid"]
   if include_test:
     splits.append("test")
 
   _ensure_dir(out_dir)
 
-  stats = {
-    "a": CopyStats(),
-    "b": CopyStats(),
-    "total": CopyStats(),
-  }
+  stats: dict[str, CopyStats] = {"total": CopyStats()}
+  for idx, ds in enumerate(datasets):
+    stats[f"d{idx}"] = CopyStats()
 
   for split in splits:
-    for tag, base in (("a", dataset_a), ("b", dataset_b)):
+    for idx, base in enumerate(datasets):
+      tag = f"d{idx}"
       img_src = base / split / "images"
       lbl_src = base / split / "labels"
       img_dst = out_dir / split / "images"
@@ -104,8 +123,8 @@ def merge_two_yolo_datasets(
 def main():
   parser = argparse.ArgumentParser()
   repo_root = Path(__file__).resolve().parents[1]
-  parser.add_argument("--yolov8-dir", default=str(repo_root / "Dragon Fruit.yolov8"))
-  parser.add_argument("--yolov11-dir", default=str(repo_root / "Dragon Fruit.yolov11"))
+  parser.add_argument("--yolov8-dir", default=str(repo_root / "Dragon Fruit Vignan.v2i.yolov8"))
+  parser.add_argument("--yolov11-dir", default=str(repo_root / "Dragon Fruit Vignan.v2i.yolov11"))
   parser.add_argument("--out-dir", default=str(repo_root / "backend" / "datasets" / "internet_combined"))
   parser.add_argument("--include-test", action="store_true")
   parser.add_argument("--limit-per-split", type=int, default=None)

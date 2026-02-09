@@ -78,8 +78,8 @@ export const ChatbotService = {
     }
 
     if (text.includes('stats') || text.includes('history') || text.includes('recent') || text.includes('my scans')) {
-      const stats = await ScanService.getStats();
-      const scans = await ScanService.getScans();
+      const stats = await ScanService.getStats({ user });
+      const scans = await ScanService.getScans({ user });
       const recent = scans.slice(0, 3);
 
       const lines = [
@@ -116,7 +116,7 @@ export const ChatbotService = {
       const wantsForecast = text.includes('forecast') || text.includes('7') || text.includes('7-day') || text.includes('7 day');
       try {
         if (wantsForecast) {
-          const rep = await getEnvironmentalReport({ force: true });
+          const rep = await getEnvironmentalReport({ force: true, user });
           const place = rep.place?.label || 'your location';
           const cur = rep.forecast?.current;
           const days = Array.isArray(rep.forecast?.days) ? rep.forecast.days.slice(0, 5) : [];
@@ -139,7 +139,7 @@ export const ChatbotService = {
           return { text: lines.join('\n') };
         }
 
-        const env = await getEnvironment({ force: true });
+        const env = await getEnvironment({ force: true, user });
         const place = env.place?.label || 'your location';
         const w = env.weather;
         const coords = env.coords;

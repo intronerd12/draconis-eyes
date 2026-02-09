@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChatbotService } from '../services/ChatbotService';
+import { getUserNamespace, sanitizeForKey } from '../services/storageScope';
 
 const THEME = {
   primary: '#C71585',
@@ -28,7 +29,7 @@ const THEME = {
   botBubble: '#ffffff',
 };
 
-const STORAGE_KEY = 'chat_history_v1';
+const STORAGE_KEY_BASE = 'chat_history_v1';
 
 const makeId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
@@ -72,6 +73,11 @@ const TypingIndicator = () => {
 export default function ChatbotScreen({ navigation, user }) {
   const insets = useSafeAreaInsets();
 
+  const storageKey = useMemo(() => {
+    const ns = sanitizeForKey(getUserNamespace(user));
+    return ns ? `${STORAGE_KEY_BASE}:${ns}` : `${STORAGE_KEY_BASE}:anon`;
+  }, [user?.id, user?._id, user?.userId, user?.uid, user?.email, user?.username]);
+
   const quickPrompts = useMemo(
     () => [
       { label: 'Scan tips', text: 'Scan tips' },
@@ -91,7 +97,7 @@ export default function ChatbotScreen({ navigation, user }) {
   useEffect(() => {
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        const raw = await AsyncStorage.getItem(storageKey);
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length) {
@@ -111,16 +117,16 @@ export default function ChatbotScreen({ navigation, user }) {
         },
       ]);
     })();
-  }, []);
+  }, [storageKey]);
 
   useEffect(() => {
     (async () => {
       try {
         const trimmed = messages.slice(-60);
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+        await AsyncStorage.setItem(storageKey, JSON.stringify(trimmed));
       } catch {}
     })();
-  }, [messages]);
+  }, [messages, storageKey]);
 
   const scrollToBottom = () => {
     try {
@@ -215,7 +221,12 @@ export default function ChatbotScreen({ navigation, user }) {
           </View>
 
           <TouchableOpacity
-            onPress={() => setMessages((prev) => (prev?.length ? [prev[0]] : prev))}
+            onPress={async () => {
+              setMessages((prev) => (prev?.length ? [prev[0]] : prev));
+              try {
+                await AsyncStorage.removeItem(storageKey);
+              } catch {}
+            }}
             style={styles.clearBtn}
             activeOpacity={0.85}
           >

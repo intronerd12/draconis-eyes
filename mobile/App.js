@@ -19,6 +19,9 @@ import WeatherScreen from './screens/WeatherScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
 import MappingEnvironmentScreen from './screens/MappingEnvironmentScreen';
 
+import { clearEnvironmentCaches } from './services/EnvironmentService';
+import { getUserNamespace, sanitizeForKey } from './services/storageScope';
+
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
@@ -51,8 +54,12 @@ function MainTabs({ user, handleLogout }) {
       <Tab.Screen name="Home">
         {props => <HomeScreen {...props} user={user} onLogout={handleLogout} />}
       </Tab.Screen>
-      <Tab.Screen name="Scan" component={ScanScreen} />
-      <Tab.Screen name="Sorting" component={SortingGradingScreen} />
+      <Tab.Screen name="Scan">
+        {props => <ScanScreen {...props} user={user} />}
+      </Tab.Screen>
+      <Tab.Screen name="Sorting">
+        {props => <SortingGradingScreen {...props} user={user} />}
+      </Tab.Screen>
       <Tab.Screen name="Chat">
         {props => <ChatbotScreen {...props} user={user} />}
       </Tab.Screen>
@@ -66,6 +73,7 @@ function MainTabs({ user, handleLogout }) {
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const userKey = sanitizeForKey(getUserNamespace(user)) || 'anon';
 
   useEffect(() => {
     checkUser();
@@ -90,8 +98,10 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    const prevUser = user;
     setUser(null);
     await AsyncStorage.removeItem('user');
+    await clearEnvironmentCaches({ user: prevUser });
   };
 
   const handleUpdateUser = async (updatedUser) => {
@@ -111,13 +121,15 @@ export default function App() {
     <PaperProvider>
       <NavigationContainer>
         {user ? (
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Navigator key={`user:${userKey}`} screenOptions={{ headerShown: false }}>
             <Stack.Screen name="MainTabs">
-              {props => <MainTabs {...props} user={user} handleLogout={handleLogout} />}
+              {props => <MainTabs {...props} user={user} handleLogout={handleLogout} key={`tabs:${userKey}`} />}
             </Stack.Screen>
             <Stack.Screen name="Guide" component={GuideScreen} />
             <Stack.Screen name="Weather" component={WeatherScreen} />
-            <Stack.Screen name="MappingEnvironment" component={MappingEnvironmentScreen} />
+            <Stack.Screen name="MappingEnvironment">
+              {props => <MappingEnvironmentScreen {...props} user={user} />}
+            </Stack.Screen>
             <Stack.Screen name="EditProfile">
               {props => <EditProfileScreen {...props} onUpdateUser={handleUpdateUser} />}
             </Stack.Screen>

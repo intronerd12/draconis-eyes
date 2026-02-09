@@ -13,7 +13,6 @@ import { Text, Surface, Avatar, Portal, Dialog, Button, Paragraph } from 'react-
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { BlurView } from 'expo-blur';
@@ -68,8 +67,8 @@ export default function HomeScreen({ user, onLogout }) {
   );
 
   const loadData = async () => {
-    const s = await ScanService.getStats();
-    const r = await ScanService.getScans();
+    const s = await ScanService.getStats({ user });
+    const r = await ScanService.getScans({ user });
     setStats(s);
     setRecentScans(r.slice(0, 5)); // Show top 5
   };
@@ -121,7 +120,6 @@ export default function HomeScreen({ user, onLogout }) {
   const handleLogoutConfirm = async () => {
     setLogoutVisible(false);
     try {
-      await AsyncStorage.removeItem('user');
       if (onLogout) onLogout();
     } catch (error) {
       console.error('Error logging out:', error);

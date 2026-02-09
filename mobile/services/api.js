@@ -6,7 +6,7 @@ const getBaseUrl = () => {
   if (Platform.OS === 'android') {
     // 10.0.2.2 is the special alias to your host loopback interface (127.0.0.1) on the development machine
     // If using a physical device, change this to your LAN IP (e.g., 'http://192.168.1.5:5000')
-    return 'http://10.221.197.207:5000';
+    return 'http://192.168.254.137:5000';
   } else if (Platform.OS === 'web') {
     return 'http://localhost:5000';
   } else if (Platform.OS === 'ios') {

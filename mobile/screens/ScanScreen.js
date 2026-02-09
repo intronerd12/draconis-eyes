@@ -7,10 +7,11 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScanService } from '../services/ScanService';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 
 const { width, height } = Dimensions.get('window');
 
-export default function ScanScreen() {
+export default function ScanScreen({ user }) {
   const navigation = useNavigation();
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
@@ -52,6 +53,14 @@ export default function ScanScreen() {
           We need your permission to show the camera
         </Text>
         <PaperButton onPress={requestPermission} mode="contained">Grant Permission</PaperButton>
+        <PaperButton
+          onPress={() => handlePickFromGallery()}
+          mode="outlined"
+          textColor="#FFF"
+          style={{ marginTop: 12, borderColor: 'rgba(255,255,255,0.6)' }}
+        >
+          Upload From Gallery
+        </PaperButton>
         <TouchableOpacity onPress={() => navigation.navigate('Home')} style={{ marginTop: 20 }}>
           <Text style={{ color: 'white' }}>Cancel</Text>
         </TouchableOpacity>
@@ -59,40 +68,112 @@ export default function ScanScreen() {
     );
   }
 
-  const handleScan = async () => {
+  async function analyzeAndSave(imageUri) {
+    if (scanning) return;
+
+    setScanning(true);
+    try {
+      // Analyze Image
+      const result = await ScanService.analyzeImage(imageUri);
+
+      // Save to History (scoped by user)
+      const savedScan = await ScanService.addScan(
+        {
+          ...result,
+          imageUri, // Save local URI for display; ScanService moves it to permanent storage
+        },
+        { user }
+      );
+
+      setScanResult({ ...result, imageUri: savedScan?.imageUri || imageUri });
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Scan Error', 'Could not analyze image. Please try again.');
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  async function handleScan() {
     if (scanning) return;
     if (!cameraRef.current) return;
 
-    setScanning(true);
-    
     try {
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.7,
         skipProcessing: true,
       });
-
-      // Analyze Image
-      const result = await ScanService.analyzeImage(photo.uri);
-      
-      // Save to History
-      await ScanService.addScan({
-        ...result,
-        imageUri: photo.uri // Save local URI for display
-      });
-
-      setScanResult({ ...result, imageUri: photo.uri });
-
+      await analyzeAndSave(photo.uri);
     } catch (error) {
       console.error(error);
-      Alert.alert("Scan Error", "Could not analyze image. Please try again.");
-    } finally {
-      setScanning(false);
+      Alert.alert('Camera Error', 'Could not capture image. Please try again.');
     }
-  };
+  }
+
+  async function handlePickFromGallery() {
+    if (scanning) return;
+
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission Required', 'Please allow photo library access to upload an image.');
+        return;
+      }
+
+      const pickerResult = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: false,
+        allowsEditing: false,
+        quality: 0.7,
+        exif: false,
+      });
+
+      if (pickerResult.canceled) return;
+      const asset = pickerResult.assets?.[0];
+      const uri = asset?.uri;
+      if (!uri) {
+        Alert.alert('Upload Error', 'No image was selected.');
+        return;
+      }
+
+      await analyzeAndSave(uri);
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Upload Error', 'Could not open gallery. Please try again.');
+    }
+  }
 
   const handleReset = () => {
     setScanResult(null);
     setScanning(false);
+  };
+
+  const handleSendForTraining = async () => {
+    if (!scanResult?.imageUri) return;
+    if (scanning) return;
+
+    Alert.alert(
+      'Help Improve AI',
+      'Send this image to improve future scan accuracy? This will upload the image to the server for training.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send',
+          style: 'default',
+          onPress: async () => {
+            setScanning(true);
+            try {
+              await ScanService.uploadTrainingSample(scanResult.imageUri, { source: 'mobile_opt_in' });
+              Alert.alert('Thank you', 'Uploaded successfully. This will help improve the model.');
+            } catch (e) {
+              Alert.alert('Upload Failed', e?.message || 'Could not upload this image.');
+            } finally {
+              setScanning(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const formatPesoPerKg = (amount) => {
@@ -239,6 +320,16 @@ export default function ScanScreen() {
             </Card.Content>
           </Card>
 
+          <PaperButton
+            mode="outlined"
+            onPress={handleSendForTraining}
+            disabled={scanning}
+            style={styles.helpImproveBtn}
+            textColor="#C71585"
+          >
+            Help Improve Results (Send Image)
+          </PaperButton>
+
           <PaperButton 
             mode="contained" 
             onPress={handleReset} 
@@ -283,8 +374,18 @@ export default function ScanScreen() {
 
         <Text style={styles.instruction}>Align dragonfruit within frame</Text>
 
-        <View style={styles.controls}>
-          <TouchableOpacity onPress={handleScan} disabled={scanning}>
+        <View style={styles.controlsRow}>
+          <TouchableOpacity
+            onPress={handlePickFromGallery}
+            disabled={scanning}
+            style={styles.sideActionBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Upload from gallery"
+          >
+            <Ionicons name="images-outline" size={26} color="#FFF" />
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={handleScan} disabled={scanning} accessibilityRole="button" accessibilityLabel="Capture photo">
             <View style={styles.captureBtnOuter}>
               <View style={styles.captureBtnInner}>
                 {scanning ? (
@@ -295,6 +396,8 @@ export default function ScanScreen() {
               </View>
             </View>
           </TouchableOpacity>
+
+          <View style={styles.sideActionBtn} />
         </View>
       </View>
     </View>
@@ -367,9 +470,22 @@ const styles = StyleSheet.create({
     textShadowOffset: {width: -1, height: 1},
     textShadowRadius: 10
   },
-  controls: {
+  controlsRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 36,
     marginBottom: 20,
+  },
+  sideActionBtn: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   captureBtnOuter: {
     width: 80,
@@ -516,5 +632,11 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     paddingVertical: 8,
     borderRadius: 25,
-  }
+  },
+  helpImproveBtn: {
+    marginTop: 14,
+    borderColor: 'rgba(199, 21, 133, 0.45)',
+    borderWidth: 1,
+    borderRadius: 16,
+  },
 });

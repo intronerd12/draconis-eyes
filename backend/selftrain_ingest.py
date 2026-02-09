@@ -7,8 +7,29 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from PIL import Image
+import numpy as np
 
 from yolo_runtime import Detection, get_yolo_runtime
+
+
+def _quality_ok(im: Image.Image, *, min_blur: float, min_brightness: float, max_brightness: float) -> tuple[bool, dict]:
+  arr = np.array(im.convert("RGB"), dtype=np.uint8)
+  gray = (0.299 * arr[..., 0] + 0.587 * arr[..., 1] + 0.114 * arr[..., 2]).astype(np.float32)
+  brightness = float(np.mean(gray) / 255.0)
+
+  blur = 0.0
+  try:
+    import cv2  # type: ignore
+    lap = cv2.Laplacian(gray, cv2.CV_32F)
+    blur = float(lap.var())
+  except Exception:
+    g = gray
+    dx2 = g[:, 2:] - 2 * g[:, 1:-1] + g[:, :-2]
+    dy2 = g[2:, :] - 2 * g[1:-1, :] + g[:-2, :]
+    blur = float(np.var(dx2) + np.var(dy2))
+
+  ok = (blur >= float(min_blur)) and (float(min_brightness) <= brightness <= float(max_brightness))
+  return ok, {"brightness": round(brightness, 6), "blur": round(blur, 6)}
 
 
 def _ensure_dir(p: Path):
@@ -45,6 +66,10 @@ def ingest(
   valid_split: float,
   seed: int,
   limit: int | None,
+  min_blur: float,
+  min_brightness: float,
+  max_brightness: float,
+  max_dets: int,
 ):
   rt = get_yolo_runtime()
   if rt is None:
@@ -74,9 +99,15 @@ def ingest(
   written = 0
   for src in images:
     im = Image.open(src).convert("RGB")
+    ok, q = _quality_ok(im, min_blur=float(min_blur), min_brightness=float(min_brightness), max_brightness=float(max_brightness))
+    if not ok:
+      continue
     w, h = im.size
     dets = [d for d in rt.predict(im, conf=float(min_conf)) if float(d.conf) >= float(min_conf)]
     if not dets:
+      continue
+    if int(max_dets) > 0 and len(dets) > int(max_dets):
+      # Too many detections usually indicates clutter/background false-positives.
       continue
 
     dst_base = f"{src.stem}_{abs(hash(str(src))) % 10**10}"
@@ -97,6 +128,8 @@ def ingest(
       "source_path": str(src),
       "image_path": str(img_dst),
       "label_path": str(lbl_dst),
+      "quality": q,
+      "min_conf": float(min_conf),
       "detections": [asdict(d) for d in dets],
     }
     with open(manifest_path, "a", encoding="utf-8") as f:
@@ -123,6 +156,10 @@ def main():
   parser.add_argument("--valid-split", type=float, default=0.1)
   parser.add_argument("--seed", type=int, default=7)
   parser.add_argument("--limit", type=int, default=None)
+  parser.add_argument("--min-blur", type=float, default=25.0)
+  parser.add_argument("--min-brightness", type=float, default=0.08)
+  parser.add_argument("--max-brightness", type=float, default=0.98)
+  parser.add_argument("--max-dets", type=int, default=3)
   args = parser.parse_args()
 
   info = ingest(
@@ -132,6 +169,10 @@ def main():
     valid_split=args.valid_split,
     seed=args.seed,
     limit=args.limit,
+    min_blur=args.min_blur,
+    min_brightness=args.min_brightness,
+    max_brightness=args.max_brightness,
+    max_dets=args.max_dets,
   )
   print(info["dataset_dir"])
   print(info["written"])
@@ -139,4 +180,3 @@ def main():
 
 if __name__ == "__main__":
   main()
-

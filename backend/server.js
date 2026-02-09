@@ -31,6 +31,7 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/scan', require('./routes/scanRoutes'));
 app.use('/api/weather', require('./routes/weatherRoutes'));
+app.use('/api/train', require('./routes/trainRoutes'));
 
 // Connect to Database
 connectDB();

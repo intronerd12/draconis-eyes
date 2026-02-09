@@ -23,16 +23,16 @@ def _require_ultralytics():
 
 def _dataset_paths(repo_root: Path, dataset: str) -> tuple[Path, Path]:
   if dataset.lower() == "yolov8":
-    base = repo_root / "Dragon Fruit.yolov8"
+    base = repo_root / "Dragon Fruit Vignan.v2i.yolov8"
   elif dataset.lower() == "yolov11":
-    base = repo_root / "Dragon Fruit.yolov11"
+    base = repo_root / "Dragon Fruit Vignan.v2i.yolov11"
   elif dataset.lower() == "combined":
     base = repo_root / "backend" / "datasets" / "internet_combined"
     data_yaml = base / "data.yaml"
     if not data_yaml.exists():
       merge_two_yolo_datasets(
-        dataset_a=repo_root / "Dragon Fruit.yolov8",
-        dataset_b=repo_root / "Dragon Fruit.yolov11",
+        dataset_a=repo_root / "Dragon Fruit Vignan.v2i.yolov8",
+        dataset_b=repo_root / "Dragon Fruit Vignan.v2i.yolov11",
         out_dir=base,
         include_test=False,
       )
@@ -57,6 +57,8 @@ def _default_model(dataset: str, size: str) -> str:
 def train(
   dataset: str,
   model: str,
+  data_yaml_override: str | None,
+  finetune_from: str | None,
   epochs: int,
   imgsz: int,
   device: str,
@@ -69,17 +71,40 @@ def train(
   lr0: float | None,
   cos_lr: bool,
   resume: bool,
+  hsv_h: float,
+  hsv_s: float,
+  hsv_v: float,
+  degrees: float,
+  translate: float,
+  scale: float,
+  shear: float,
+  perspective: float,
+  fliplr: float,
+  flipud: float,
+  mosaic: float,
+  mixup: float,
+  copy_paste: float,
+  erasing: float,
 ):
   YOLO = _require_ultralytics()
 
   repo_root = Path(__file__).resolve().parents[1]
-  _, data_yaml = _dataset_paths(repo_root, dataset)
+  if data_yaml_override:
+    data_yaml = Path(data_yaml_override)
+  else:
+    _, data_yaml = _dataset_paths(repo_root, dataset)
+  if not data_yaml.exists():
+    raise FileNotFoundError(str(data_yaml))
 
   out_dir = repo_root / "backend" / "ml_models" / "yolo_runs"
   out_dir.mkdir(parents=True, exist_ok=True)
   run_name = f"{dataset.lower()}_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-  yolo = YOLO(model)
+  # Warm-start: fine-tune from a prior best checkpoint when available.
+  if finetune_from and os.path.exists(finetune_from):
+    yolo = YOLO(finetune_from)
+  else:
+    yolo = YOLO(model)
   results = yolo.train(
     data=str(data_yaml),
     epochs=int(epochs),
@@ -94,6 +119,21 @@ def train(
     lr0=(None if lr0 is None else float(lr0)),
     cos_lr=bool(cos_lr),
     resume=bool(resume),
+    # Augmentation defaults tuned for dragon fruit (color/lighting variability; limited geometry).
+    hsv_h=float(hsv_h),
+    hsv_s=float(hsv_s),
+    hsv_v=float(hsv_v),
+    degrees=float(degrees),
+    translate=float(translate),
+    scale=float(scale),
+    shear=float(shear),
+    perspective=float(perspective),
+    fliplr=float(fliplr),
+    flipud=float(flipud),
+    mosaic=float(mosaic),
+    mixup=float(mixup),
+    copy_paste=float(copy_paste),
+    erasing=float(erasing),
     project=str(out_dir),
     name=run_name,
     exist_ok=False,
@@ -129,6 +169,23 @@ def train(
     "lr0": (None if lr0 is None else float(lr0)),
     "cos_lr": bool(cos_lr),
     "resume": bool(resume),
+    "finetune_from": finetune_from,
+    "augment": {
+      "hsv_h": float(hsv_h),
+      "hsv_s": float(hsv_s),
+      "hsv_v": float(hsv_v),
+      "degrees": float(degrees),
+      "translate": float(translate),
+      "scale": float(scale),
+      "shear": float(shear),
+      "perspective": float(perspective),
+      "fliplr": float(fliplr),
+      "flipud": float(flipud),
+      "mosaic": float(mosaic),
+      "mixup": float(mixup),
+      "copy_paste": float(copy_paste),
+      "erasing": float(erasing),
+    },
     "run_dir": str(run_dir),
   }
   with open(meta_dst, "w", encoding="utf-8") as f:
@@ -152,8 +209,10 @@ def train(
 def main():
   parser = argparse.ArgumentParser()
   parser.add_argument("--dataset", choices=["yolov8", "yolov11", "combined"], required=True)
+  parser.add_argument("--data", default=None, help="Override data.yaml path (skips --dataset lookup)")
   parser.add_argument("--model", default=None)
   parser.add_argument("--model-size", default="s")
+  parser.add_argument("--finetune-from", default=None, help="Path to .pt checkpoint to fine-tune from")
   parser.add_argument("--epochs", type=int, default=120)
   parser.add_argument("--imgsz", type=int, default=640)
   parser.add_argument("--device", default="cpu")
@@ -166,6 +225,21 @@ def main():
   parser.add_argument("--lr0", type=float, default=None)
   parser.add_argument("--cos-lr", action="store_true")
   parser.add_argument("--resume", action="store_true")
+  # Augmentation knobs
+  parser.add_argument("--hsv-h", type=float, default=0.015)
+  parser.add_argument("--hsv-s", type=float, default=0.65)
+  parser.add_argument("--hsv-v", type=float, default=0.45)
+  parser.add_argument("--degrees", type=float, default=8.0)
+  parser.add_argument("--translate", type=float, default=0.10)
+  parser.add_argument("--scale", type=float, default=0.45)
+  parser.add_argument("--shear", type=float, default=2.0)
+  parser.add_argument("--perspective", type=float, default=0.0005)
+  parser.add_argument("--fliplr", type=float, default=0.5)
+  parser.add_argument("--flipud", type=float, default=0.0)
+  parser.add_argument("--mosaic", type=float, default=0.7)
+  parser.add_argument("--mixup", type=float, default=0.05)
+  parser.add_argument("--copy-paste", type=float, default=0.0)
+  parser.add_argument("--erasing", type=float, default=0.0)
   args = parser.parse_args()
 
   if args.model:
@@ -177,6 +251,8 @@ def main():
   info = train(
     dataset=args.dataset,
     model=model,
+    data_yaml_override=args.data,
+    finetune_from=args.finetune_from,
     epochs=args.epochs,
     imgsz=args.imgsz,
     device=args.device,
@@ -189,6 +265,20 @@ def main():
     lr0=args.lr0,
     cos_lr=args.cos_lr,
     resume=args.resume,
+    hsv_h=args.hsv_h,
+    hsv_s=args.hsv_s,
+    hsv_v=args.hsv_v,
+    degrees=args.degrees,
+    translate=args.translate,
+    scale=args.scale,
+    shear=args.shear,
+    perspective=args.perspective,
+    fliplr=args.fliplr,
+    flipud=args.flipud,
+    mosaic=args.mosaic,
+    mixup=args.mixup,
+    copy_paste=args.copy_paste,
+    erasing=args.erasing,
   )
   print(info["run_dir"])
   if info["best_weights"]:
