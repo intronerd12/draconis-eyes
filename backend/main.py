@@ -580,9 +580,15 @@ async def detect_quality(
 
         weight_grams = int(round(np.clip(200.0 + 1650.0 * fruit_area_ratio, 180.0, 900.0)))
             
-        # Identification (Placeholder for species, can't reliably detect species without ML)
-        fruit_types = ["Pink (Hylocereus undatus)", "White (Hylocereus undatus)", "Yellow (Selenicereus megalanthus)"]
-        fruit_type = fruit_types[0] # Default to most common
+        brightness_rgb = (r + g + b) / 3.0
+        sat_rgb = (max(r, g, b) - min(r, g, b))
+
+        if (r > 110 and g > 110 and b < 120) and abs(r - g) < 70:
+            fruit_type = "Yellow (Selenicereus megalanthus)"
+        elif brightness_rgb > 175 and sat_rgb < 55:
+            fruit_type = "White (Hylocereus undatus)"
+        else:
+            fruit_type = "Pink (Hylocereus undatus)"
         
         # Shape Analysis
         aspect_ratio = max(width, height) / min(width, height)

@@ -189,6 +189,15 @@ export default function ScanScreen({ user }) {
         ? `data:image/jpeg;base64,${scanResult.segmentation_preview_base64}`
         : null;
 
+    const recommendations = Array.isArray(scanResult.recommendations) ? scanResult.recommendations : [];
+    const q = scanResult.image_quality;
+    const qualityTips = [];
+    if (q && typeof q === 'object') {
+      if (typeof q.blur === 'number' && q.blur < 25) qualityTips.push('Image looks blurry. Hold steady and tap to focus.');
+      if (typeof q.brightness === 'number' && q.brightness < 0.08) qualityTips.push('Image is too dark. Use brighter light.');
+      if (typeof q.brightness === 'number' && q.brightness > 0.98) qualityTips.push('Image is too bright. Avoid glare and direct flash.');
+    }
+
     return (
       <View style={styles.resultContainer}>
         <LinearGradient
@@ -319,6 +328,63 @@ export default function ScanScreen({ user }) {
               </View>
             </Card.Content>
           </Card>
+
+          {(qualityTips.length > 0 || (q && typeof q === 'object')) && (
+            <Card style={styles.resultCard}>
+              <Card.Title title="Image Quality" />
+              <Card.Content>
+                {qualityTips.length > 0 ? (
+                  qualityTips.map((t, idx) => (
+                    <View key={`qt-${idx}`} style={styles.tipRow}>
+                      <Ionicons name="information-circle-outline" size={18} color="#C71585" />
+                      <Text style={styles.tipText}>{t}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.tipText}>Image quality looks good.</Text>
+                )}
+                <Divider style={{ marginVertical: 10 }} />
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Brightness:</Text>
+                  <Text style={styles.detailValue}>
+                    {typeof q?.brightness === 'number' ? q.brightness.toFixed(2) : '—'}
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Blur:</Text>
+                  <Text style={styles.detailValue}>
+                    {typeof q?.blur === 'number' ? Math.round(q.blur) : '—'}
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Contrast:</Text>
+                  <Text style={styles.detailValue}>
+                    {typeof q?.contrast === 'number' ? q.contrast.toFixed(2) : '—'}
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Saturation:</Text>
+                  <Text style={styles.detailValue}>
+                    {typeof q?.saturation === 'number' ? q.saturation.toFixed(2) : '—'}
+                  </Text>
+                </View>
+              </Card.Content>
+            </Card>
+          )}
+
+          {recommendations.length > 0 && (
+            <Card style={styles.resultCard}>
+              <Card.Title title="Recommendations & Preventive Measures" />
+              <Card.Content>
+                {recommendations.map((t, idx) => (
+                  <View key={`rec-${idx}`} style={styles.tipRow}>
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#2E7D32" />
+                    <Text style={styles.tipText}>{t}</Text>
+                  </View>
+                ))}
+              </Card.Content>
+            </Card>
+          )}
 
           <PaperButton
             mode="outlined"
@@ -626,6 +692,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     maxWidth: '60%',
     textAlign: 'right',
+  },
+  tipRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 10,
+  },
+  tipText: {
+    flex: 1,
+    color: '#333',
+    fontSize: 14,
+    lineHeight: 20,
   },
   scanAgainBtn: {
     marginTop: 10,

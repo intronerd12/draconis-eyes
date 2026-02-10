@@ -31,6 +31,7 @@ def main():
     # Ingest controls
     parser.add_argument("--min-conf", type=float, default=0.55)
     parser.add_argument("--valid-split", type=float, default=0.1)
+    parser.add_argument("--pseudo-limit", type=int, default=100)
     parser.add_argument("--min-blur", type=float, default=25.0)
     parser.add_argument("--min-brightness", type=float, default=0.08)
     parser.add_argument("--max-brightness", type=float, default=0.98)
@@ -78,7 +79,7 @@ def main():
             min_conf=float(args.min_conf),
             valid_split=float(args.valid_split),
             seed=7,
-            limit=None,
+            limit=(None if int(args.pseudo_limit) <= 0 else int(args.pseudo_limit)),
             min_blur=float(args.min_blur),
             min_brightness=float(args.min_brightness),
             max_brightness=float(args.max_brightness),
@@ -150,4 +151,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

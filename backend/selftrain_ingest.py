@@ -76,11 +76,10 @@ def ingest(
     raise RuntimeError("YOLO runtime is not available. Train weights first and install ML requirements.")
 
   images = _list_images(uploads_dir)
-  if limit is not None:
-    images = images[: int(limit)]
-
   rng = random.Random(int(seed))
   rng.shuffle(images)
+  if limit is not None:
+    images = images[: int(limit)]
   n_valid = int(round(len(images) * float(valid_split)))
   valid_set = set(images[:n_valid])
 

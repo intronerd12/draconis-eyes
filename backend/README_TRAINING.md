@@ -75,5 +75,11 @@ python backend/selftrain_ingest.py
 
 Or run the full self-training loop (ingest -> merge -> fine-tune -> eval):
 ```bash
-python backend/selftrain_pipeline.py --device cpu
+python backend/selftrain_pipeline.py --device cpu --pseudo-limit 100
 ```
+
+Notes:
+- The base training set uses the full internet datasets from:
+  - `Dragon Fruit Vignan.v2i.yolov8/`
+  - `Dragon Fruit Vignan.v2i.yolov11/`
+- The self-training loop adds a small batch of new shop/mobile images each run (default: 100) to keep labels clean and training stable.
