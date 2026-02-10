@@ -15,6 +15,12 @@ Install:
 pip install -r backend/requirements-ml.txt
 ```
 
+Or (Windows / this repo's venv):
+```bash
+cd backend
+npm run ml:install
+```
+
 ## 2) (Optional) Merge YOLOv8 + YOLOv11 datasets
 
 This creates:
@@ -32,6 +38,11 @@ python backend/dataset_merge.py --include-test
 Train using the combined dataset:
 ```bash
 python backend/yolo_train.py --dataset combined --model-size s --epochs 120 --imgsz 640 --device cpu --cache --cos-lr
+```
+
+For best accuracy (trains both YOLOv8 + YOLOv11 and auto-selects the best on validation):
+```bash
+python backend/train_full.py --device cpu --cache --cos-lr
 ```
 
 Train only YOLOv8 dataset:
@@ -62,6 +73,18 @@ When `backend/ml_models/yolo_best.pt` exists and Ultralytics is installed, `/det
 
 If weights or Ultralytics are missing, it safely falls back to heuristics.
 
+### Dev mode (recommended)
+
+Running `npm run dev` in `backend/` starts both:
+- Node API (`server.js`)
+- Python AI service (`uvicorn main:app`)
+
+It also auto-installs ML requirements and (if missing) auto-trains `ml_models/yolo_best.pt` so scanning works consistently.
+
+Optional:
+- Set `DRAGON_AUTO_TRAIN=0` to skip auto-training if weights are missing.
+- Set `DRAGON_BOOTSTRAP_EPOCHS=40` to control the auto-train epochs used by `npm run dev`.
+
 ## 5) Upload shop photos for self-training (later)
 
 API:
@@ -83,3 +106,21 @@ Notes:
   - `Dragon Fruit Vignan.v2i.yolov8/`
   - `Dragon Fruit Vignan.v2i.yolov11/`
 - The self-training loop adds a small batch of new shop/mobile images each run (default: 100) to keep labels clean and training stable.
+
+## Keeping the model improving automatically (recommended workflow)
+
+1) Run the server normally (scanning uses `backend/ml_models/yolo_best.pt`).
+2) Keep collecting new shop/mobile images (opt-in upload + auto-collection).
+3) Re-train on a schedule:
+   - Nightly/weekly: fine-tune using new images + full base dataset:
+     ```bash
+     cd backend
+     npm run retrain:self
+     ```
+   - Monthly (or after major dataset updates): full retrain and auto-select best backbone:
+     ```bash
+     cd backend
+     npm run train:full
+     ```
+
+To lock down the reload endpoint, set `DRAGON_ADMIN_TOKEN` in the Python environment and pass the same value as `X-Admin-Token` when calling reload.

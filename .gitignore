@@ -14,6 +14,10 @@ uploads/
 backend/uploads/
 backend/training_uploads/
 backend/data/
+backend/datasets/
+backend/ml_models/yolo_runs/
+backend/ml_models/*.pt
+backend/yolov*.pt
 mobile/.expo/
 mobile/.expo-shared/
 mobile/dist/

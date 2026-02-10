@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Form
+from fastapi import FastAPI, File, UploadFile, Form, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from PIL import Image, ImageOps
@@ -13,10 +13,11 @@ from pathlib import Path
 import numpy as np
 
 try:
-    from yolo_runtime import get_yolo_runtime, detections_to_mask
+    from yolo_runtime import get_yolo_runtime, detections_to_mask, reset_yolo_runtime
 except Exception:
     get_yolo_runtime = None
     detections_to_mask = None
+    reset_yolo_runtime = None
 
 try:
     from selftrain.collector import compute_image_quality, save_training_sample, should_collect_sample
@@ -373,6 +374,17 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+
+
+@app.post("/admin/reload-yolo")
+def reload_yolo(x_admin_token: str | None = Header(None, alias="X-Admin-Token")):
+    token = os.environ.get("DRAGON_ADMIN_TOKEN")
+    if token and (not x_admin_token or x_admin_token != token):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if callable(reset_yolo_runtime):
+        reset_yolo_runtime()
+    rt = get_yolo_runtime() if callable(get_yolo_runtime) else None
+    return {"status": "ok", "enabled": bool(rt)}
 
 
 @app.post("/train/upload")

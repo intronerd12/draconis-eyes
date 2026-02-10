@@ -94,6 +94,11 @@ def get_yolo_runtime() -> YoloRuntime | None:
     return None
 
 
+def reset_yolo_runtime() -> None:
+  global _RUNTIME
+  _RUNTIME = None
+
+
 def detections_to_mask(detections: list[Detection], width: int, height: int) -> np.ndarray:
   mask = np.zeros((height, width), dtype=bool)
   for d in detections:
@@ -105,4 +110,3 @@ def detections_to_mask(detections: list[Detection], width: int, height: int) -> 
       continue
     mask[y0:y1, x0:x1] = True
   return mask
-

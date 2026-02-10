@@ -5,7 +5,13 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "concurrently \"nodemon server.js\" \"set DRAGON_YOLO_WEIGHTS=ml_models\\\\yolo_best.pt&& set DRAGON_SELFTRAIN_ENABLED=1&& ..\\\\.venv\\\\Scripts\\\\python.exe -m uvicorn main:app --reload --port 8000\""
+    "dev": "concurrently \"nodemon server.js\" \"powershell -NoProfile -ExecutionPolicy Bypass -File dev_ai.ps1\"",
+    "ml:install": "..\\\\.venv\\\\Scripts\\\\python.exe -m pip install -r requirements-ml.txt",
+    "train:full": "..\\\\.venv\\\\Scripts\\\\python.exe train_full.py --device cpu --cache --cos-lr",
+    "train:self": "..\\\\.venv\\\\Scripts\\\\python.exe selftrain_pipeline.py --device cpu --pseudo-limit 100",
+    "eval:yolo": "..\\\\.venv\\\\Scripts\\\\python.exe yolo_eval.py --weights ml_models\\\\yolo_best.pt --data datasets\\\\internet_combined\\\\data.yaml --device cpu",
+    "reload:yolo": "node -e \"fetch('http://localhost:8000/admin/reload-yolo',{method:'POST',headers:{'X-Admin-Token':process.env.DRAGON_ADMIN_TOKEN||''}}).then(r=>r.json()).then(j=>{console.log(JSON.stringify(j,null,2))}).catch(e=>{console.error(e);process.exit(1)})\"",
+    "retrain:self": "((..\\\\.venv\\\\Scripts\\\\python.exe -c \"import ultralytics\" >NUL 2>&1) || (npm run ml:install)) && (if not exist ml_models\\\\yolo_best.pt (npm run train:full)) && npm run train:self && npm run reload:yolo"
   },
   "dependencies": {
     "axios": "^1.6.7",

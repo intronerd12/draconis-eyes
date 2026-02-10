@@ -105,39 +105,42 @@ def train(
     yolo = YOLO(finetune_from)
   else:
     yolo = YOLO(model)
-  results = yolo.train(
-    data=str(data_yaml),
-    epochs=int(epochs),
-    imgsz=int(imgsz),
-    device=device,
-    batch=int(batch),
-    patience=int(patience),
-    seed=int(seed),
-    workers=int(workers),
-    cache=bool(cache),
-    optimizer=optimizer,
-    lr0=(None if lr0 is None else float(lr0)),
-    cos_lr=bool(cos_lr),
-    resume=bool(resume),
-    # Augmentation defaults tuned for dragon fruit (color/lighting variability; limited geometry).
-    hsv_h=float(hsv_h),
-    hsv_s=float(hsv_s),
-    hsv_v=float(hsv_v),
-    degrees=float(degrees),
-    translate=float(translate),
-    scale=float(scale),
-    shear=float(shear),
-    perspective=float(perspective),
-    fliplr=float(fliplr),
-    flipud=float(flipud),
-    mosaic=float(mosaic),
-    mixup=float(mixup),
-    copy_paste=float(copy_paste),
-    erasing=float(erasing),
-    project=str(out_dir),
-    name=run_name,
-    exist_ok=False,
-  )
+
+  train_kwargs = {
+    "data": str(data_yaml),
+    "epochs": int(epochs),
+    "imgsz": int(imgsz),
+    "device": device,
+    "batch": int(batch),
+    "patience": int(patience),
+    "seed": int(seed),
+    "workers": int(workers),
+    "cache": bool(cache),
+    "optimizer": optimizer,
+    "cos_lr": bool(cos_lr),
+    "resume": bool(resume),
+    "hsv_h": float(hsv_h),
+    "hsv_s": float(hsv_s),
+    "hsv_v": float(hsv_v),
+    "degrees": float(degrees),
+    "translate": float(translate),
+    "scale": float(scale),
+    "shear": float(shear),
+    "perspective": float(perspective),
+    "fliplr": float(fliplr),
+    "flipud": float(flipud),
+    "mosaic": float(mosaic),
+    "mixup": float(mixup),
+    "copy_paste": float(copy_paste),
+    "erasing": float(erasing),
+    "project": str(out_dir),
+    "name": run_name,
+    "exist_ok": False,
+  }
+  if lr0 is not None:
+    train_kwargs["lr0"] = float(lr0)
+
+  results = yolo.train(**train_kwargs)
 
   run_dir = out_dir / run_name
   candidate_best = run_dir / "weights" / "best.pt"
