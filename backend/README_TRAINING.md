@@ -82,8 +82,10 @@ Running `npm run dev` in `backend/` starts both:
 It also auto-installs ML requirements and (if missing) auto-trains `ml_models/yolo_best.pt` so scanning works consistently.
 
 Optional:
-- Set `DRAGON_AUTO_TRAIN=0` to skip auto-training if weights are missing.
+- Use `npm run dev:no-train` to skip auto-training if weights are missing.
 - Set `DRAGON_BOOTSTRAP_EPOCHS=40` to control the auto-train epochs used by `npm run dev`.
+
+While bootstrapping, the AI service starts immediately (heuristics fallback) and will automatically switch to YOLO once training finishes.
 
 ## 5) Upload shop photos for self-training (later)
 

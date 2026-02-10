@@ -88,6 +88,39 @@ const getCoords = async () => {
 };
 
 const getPlaceDetailsFromCoords = async ({ latitude, longitude }, { signal } = {}) => {
+  try {
+    const native = await Location.reverseGeocodeAsync({ latitude, longitude });
+    const first = Array.isArray(native) ? native[0] : null;
+    if (first && typeof first === 'object') {
+      const name =
+        typeof first.city === 'string'
+          ? first.city
+          : typeof first.district === 'string'
+            ? first.district
+            : typeof first.subregion === 'string'
+              ? first.subregion
+              : typeof first.region === 'string'
+                ? first.region
+                : null;
+      const province =
+        typeof first.region === 'string'
+          ? first.region
+          : typeof first.subregion === 'string'
+            ? first.subregion
+            : null;
+      const country = typeof first.country === 'string' ? first.country : null;
+      const label = [name, province, country].filter(Boolean).join(', ') || null;
+      if (label) {
+        return {
+          label,
+          province,
+          country,
+          name,
+        };
+      }
+    }
+  } catch {}
+
   const url = `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${encodeURIComponent(
     latitude
   )}&longitude=${encodeURIComponent(longitude)}&language=en`;

@@ -6,7 +6,7 @@ const FormData = require('form-data');
 const fs = require('fs');
 
 const upload = multer({ dest: 'uploads/' });
-const PYTHON_SERVICE_URL = 'http://localhost:8000';
+const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://127.0.0.1:8000';
 
 router.post('/upload', upload.single('file'), async (req, res) => {
   if (!req.file) {
@@ -56,4 +56,3 @@ router.get('/pending', async (req, res) => {
 });
 
 module.exports = router;
-

@@ -43,8 +43,26 @@ def _startup_check():
         rt = get_yolo_runtime() if callable(get_yolo_runtime) else None
         if rt is not None:
             print("AI: YOLO self-trained model enabled.")
+            return
+
+        weights_env = os.environ.get("DRAGON_YOLO_WEIGHTS")
+        weights_exists = bool(weights_env and os.path.exists(weights_env))
+        bootstrap = os.environ.get("DRAGON_MODEL_BOOTSTRAP") == "1"
+
+        ultralytics_ok = True
+        try:
+            import ultralytics  # noqa: F401
+        except Exception:
+            ultralytics_ok = False
+
+        if bootstrap and not weights_exists:
+            print("AI: YOLO training in progress. Using heuristic fallback until weights are ready.")
+        elif not ultralytics_ok:
+            print("AI: YOLO disabled (ultralytics not installed). Using heuristic fallback.")
+        elif not weights_exists:
+            print("AI: YOLO disabled (missing weights). Using heuristic fallback.")
         else:
-            print("AI: YOLO model not enabled (missing weights or ultralytics). Using heuristic fallback.")
+            print("AI: YOLO disabled (unknown reason). Using heuristic fallback.")
     except Exception:
         print("AI: YOLO model check failed. Using heuristic fallback.")
 
@@ -57,6 +75,9 @@ LABELS_JSONL_PATH = os.path.join(DATA_DIR, "labels.jsonl")
 SCANS_JSONL_PATH = os.path.join(DATA_DIR, "scans.jsonl")
 PRICE_MODEL_PATH = os.path.join(MODEL_DIR, "price_model.json")
 DEFAULT_CURRENCY = "PHP"
+PH_RETAIL_GOOD_MIN = 136.17
+PH_RETAIL_GOOD_MAX = 245.11
+PH_RETAIL_BAD_MIN = 40.0
 TRAINING_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "training_uploads", "images")
 
 # Active-learning queue (opt-in via env)
@@ -184,6 +205,62 @@ def _predict_price_per_kg(features: dict) -> float:
     if x.shape[0] != c.shape[0]:
         return 0.0
     return float(x @ c)
+
+
+def _clamp(v: float, lo: float, hi: float) -> float:
+    if v < lo:
+        return lo
+    if v > hi:
+        return hi
+    return v
+
+
+def _price_bounds_per_kg(grade: str, defect_level: str, is_valid_fruit: bool) -> tuple[float, float]:
+    if not is_valid_fruit:
+        return (0.0, 0.0)
+
+    good_lo = float(PH_RETAIL_GOOD_MIN)
+    good_hi = float(PH_RETAIL_GOOD_MAX)
+    bad_lo = float(PH_RETAIL_BAD_MIN)
+
+    if grade == "A":
+        lo, hi = good_lo * 0.95, good_hi
+    elif grade == "B":
+        lo, hi = good_lo * 0.80, good_hi * 0.93
+    else:
+        lo, hi = good_lo * 0.45, good_lo * 0.90
+
+    if defect_level == "high":
+        lo, hi = lo * 0.85, hi * 0.80
+    elif defect_level == "medium":
+        lo, hi = lo * 0.95, hi * 0.92
+
+    lo = max(bad_lo, lo)
+    hi = max(lo, hi)
+    return (float(lo), float(hi))
+
+
+def _baseline_price_per_kg(grade: str, quality_score: float, defect_probability: float, defect_level: str) -> float:
+    q = float(np.clip(float(quality_score) / 100.0, 0.0, 1.0))
+    d = float(np.clip(float(defect_probability) / 100.0, 0.0, 1.0))
+
+    base = float(PH_RETAIL_GOOD_MIN) + (float(PH_RETAIL_GOOD_MAX) - float(PH_RETAIL_GOOD_MIN)) * q
+    if grade == "A":
+        grade_mult = 1.0
+    elif grade == "B":
+        grade_mult = 0.90
+    else:
+        grade_mult = 0.75
+
+    penalty = 1.0 - (0.35 * d)
+    if defect_level == "high":
+        penalty *= 0.80
+    elif defect_level == "medium":
+        penalty *= 0.92
+
+    price = base * grade_mult * penalty
+    lo, hi = _price_bounds_per_kg(grade, defect_level, True)
+    return float(_clamp(float(price), lo, hi))
 
 
 def _retrain_price_model() -> dict | None:
@@ -373,7 +450,17 @@ def read_root():
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy"}
+    rt = get_yolo_runtime() if callable(get_yolo_runtime) else None
+    weights_env = os.environ.get("DRAGON_YOLO_WEIGHTS")
+    weights_exists = bool(weights_env and os.path.exists(weights_env))
+    return {
+        "status": "healthy",
+        "yolo_enabled": bool(rt),
+        "weights_path": weights_env,
+        "weights_exists": weights_exists,
+        "selftrain_enabled": os.environ.get("DRAGON_SELFTRAIN_ENABLED") == "1",
+        "bootstrap_training": os.environ.get("DRAGON_MODEL_BOOTSTRAP") == "1",
+    }
 
 
 @app.post("/admin/reload-yolo")
@@ -647,16 +734,12 @@ async def detect_quality(
         # Grading
         if not is_valid_fruit:
             grade = "N/A"
-            base_price = 0.0
         elif quality_score > 85 and defect_probability < 4 and size_category != "Small":
             grade = "A"
-            base_price = 250.0
         elif quality_score > 70 and defect_probability < 8:
             grade = "B"
-            base_price = 180.0
         else:
             grade = "C"
-            base_price = 120.0
             
         color_score = float(np.clip((redness_ratio - greenness_ratio) * 10.0 + 3.5, 0.0, 10.0))
         features = {
@@ -670,10 +753,14 @@ async def detect_quality(
         }
 
         if is_valid_fruit:
+            lo_price, hi_price = _price_bounds_per_kg(grade, defect_level, True)
             model_price = _predict_price_per_kg(features)
-            if model_price <= 0:
-                model_price = base_price - (defect_probability * 3.0)
-            estimated_price_per_kg = float(max(0.0, model_price))
+            baseline_price = _baseline_price_per_kg(grade, quality_score, defect_probability, defect_level)
+            if model_price > 0:
+                model_price = float(_clamp(float(model_price), lo_price, hi_price))
+                estimated_price_per_kg = float((0.70 * model_price) + (0.30 * baseline_price))
+            else:
+                estimated_price_per_kg = float(baseline_price)
         else:
             estimated_price_per_kg = 0.0
 

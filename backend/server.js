@@ -16,7 +16,7 @@ const User = require('./models/User');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const PYTHON_SERVICE_URL = 'http://localhost:8000';
+const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://127.0.0.1:8000';
 
 app.use(cors());
 // Explicitly log all requests for debugging mobile connections
@@ -129,6 +129,7 @@ app.get('/api/health', async (req, res) => {
     ai_service: false,
     email_service: false,
   };
+  let ai_details = null;
 
   try {
     status.database = mongoose.connection.readyState === 1;
@@ -147,8 +148,9 @@ app.get('/api/health', async (req, res) => {
   }
 
   try {
-    const aiRes = await axios.get(`${PYTHON_SERVICE_URL}/health`);
+    const aiRes = await axios.get(`${PYTHON_SERVICE_URL}/health`, { timeout: 4000 });
     status.ai_service = aiRes?.data?.status === 'healthy';
+    ai_details = aiRes?.data || null;
   } catch {
     status.ai_service = false;
   }
@@ -157,6 +159,7 @@ app.get('/api/health', async (req, res) => {
   res.json({
     status: allOk ? 'ok' : 'degraded',
     components: status,
+    ai: ai_details,
   });
 });
 
@@ -185,8 +188,22 @@ const logStatus = async () => {
 
   // AI Service
   try {
-    await axios.get(`${PYTHON_SERVICE_URL}/health`);
-    console.log(`AI Service:   ✅ Connected (${PYTHON_SERVICE_URL})`);
+    let ai = null;
+    for (let i = 0; i < 5; i++) {
+      try {
+        ai = await axios.get(`${PYTHON_SERVICE_URL}/health`, { timeout: 4000 });
+        break;
+      } catch {
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+    if (ai?.data?.status === 'healthy') {
+      const yolo = ai?.data?.yolo_enabled ? 'YOLO' : 'Heuristics';
+      const boot = ai?.data?.bootstrap_training ? ' (bootstrapping)' : '';
+      console.log(`AI Service:   ✅ Connected (${PYTHON_SERVICE_URL}) - ${yolo}${boot}`);
+    } else {
+      console.log(`AI Service:   ❌ Disconnected (Is main.py running?)`);
+    }
   } catch (err) {
     console.log(`AI Service:   ❌ Disconnected (Is main.py running?)`);
   }

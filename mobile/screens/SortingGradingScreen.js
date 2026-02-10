@@ -1,7 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, StyleSheet, ScrollView, Image } from 'react-native';
-import { Text, Card, Chip, Title, Divider } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
+import { Text, Card, Chip, Title, Divider, Portal, Dialog, Button, Paragraph } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { ScanService } from '../services/ScanService';
 
 const gradeRank = { A: 3, B: 2, C: 1, 'N/A': 0 };
@@ -10,6 +11,8 @@ export default function SortingGradingScreen({ user }) {
   const [scans, setScans] = useState([]);
   const [gradeFilter, setGradeFilter] = useState('All');
   const [sortBy, setSortBy] = useState('newest');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteVisible, setDeleteVisible] = useState(false);
 
   const refresh = useCallback(async () => {
     const list = await ScanService.getScans({ user });
@@ -47,12 +50,45 @@ export default function SortingGradingScreen({ user }) {
     return `₱${value.toFixed(2)}/kg`;
   };
 
+  const openDelete = (scan) => {
+    setDeleteTarget(scan || null);
+    setDeleteVisible(true);
+  };
+
+  const confirmDelete = async () => {
+    const target = deleteTarget;
+    setDeleteVisible(false);
+    setDeleteTarget(null);
+    if (!target?.id) return;
+    try {
+      await ScanService.deleteScan(target.id, { user });
+      await refresh();
+    } catch {
+      await refresh();
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Title style={styles.headerTitle}>Sorting & Grading</Title>
         <Text style={styles.headerSubtitle}>Filter by grade and sort by value</Text>
       </View>
+
+      <Portal>
+        <Dialog visible={deleteVisible} onDismiss={() => setDeleteVisible(false)} style={{ backgroundColor: 'white' }}>
+          <Dialog.Title style={{ color: '#111' }}>Delete this scan?</Dialog.Title>
+          <Dialog.Content>
+            <Paragraph style={{ color: '#555' }}>
+              This removes the scan from your history and deletes its saved image on this device.
+            </Paragraph>
+          </Dialog.Content>
+          <Dialog.Actions style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
+            <Button onPress={() => setDeleteVisible(false)} textColor="#666">Cancel</Button>
+            <Button onPress={confirmDelete} textColor="#C71585">Delete</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
 
       <ScrollView contentContainerStyle={styles.content}>
         <Card style={styles.controlsCard}>
@@ -121,7 +157,17 @@ export default function SortingGradingScreen({ user }) {
                     <View style={styles.gradeBadge}>
                       <Text style={styles.gradeBadgeText}>{s.grade || 'N/A'}</Text>
                     </View>
-                    <Text style={styles.priceText}>{formatPesoPerKg(s.estimated_price_per_kg)}</Text>
+                    <View style={styles.itemRightTop}>
+                      <Text style={styles.priceText}>{formatPesoPerKg(s.estimated_price_per_kg)}</Text>
+                      <TouchableOpacity
+                        onPress={() => openDelete(s)}
+                        style={styles.trashBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel="Delete scan"
+                      >
+                        <Ionicons name="trash-outline" size={18} color="#C71585" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                   <Text style={styles.itemMeta}>
                     {s.size_category || '—'} • {s.market_value_label || '—'} • {s.weight_grams_est ? `${s.weight_grams_est}g` : '—'}
@@ -224,6 +270,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  itemRightTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   gradeBadge: {
     width: 36,
     height: 36,
@@ -240,6 +291,16 @@ const styles = StyleSheet.create({
   priceText: {
     fontWeight: '900',
     color: '#111',
+  },
+  trashBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: 'rgba(199, 21, 133, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(199, 21, 133, 0.14)',
   },
   itemMeta: {
     marginTop: 6,

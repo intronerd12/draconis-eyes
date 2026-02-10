@@ -10,7 +10,7 @@ const { getScans, createScan, getScanStats } = require('../controllers/scanContr
 // Configure Multer for temporary file storage
 const upload = multer({ dest: 'uploads/' });
 
-const PYTHON_SERVICE_URL = 'http://localhost:8000';
+const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://127.0.0.1:8000';
 
 // @desc    Get all scans
 // @route   GET /api/scan

@@ -18,6 +18,7 @@ export default function ScanScreen({ user }) {
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef(null);
+  const [torchEnabled, setTorchEnabled] = useState(false);
 
   const startScanAnimation = () => {
     Animated.loop(
@@ -182,6 +183,33 @@ export default function ScanScreen({ user }) {
     return `₱${value.toFixed(2)}/kg`;
   };
 
+  const formatPercent = (v) => {
+    const n = typeof v === 'number' ? v : Number(v);
+    if (!Number.isFinite(n)) return '—';
+    return `${Math.round(n)}%`;
+  };
+
+  const harvestingSummary = (r) => {
+    const ripeness = typeof r?.ripeness_score === 'number' ? r.ripeness_score : Number(r?.ripeness_score);
+    const defect = (r?.defect_level || '').toLowerCase();
+    if (!Number.isFinite(ripeness)) return { title: 'Harvesting', subtitle: 'Not enough data to suggest harvest timing.' };
+    if (defect === 'high') {
+      return { title: 'Harvesting', subtitle: 'Harvest now and consume/process immediately to reduce losses.' };
+    }
+    if (ripeness >= 85) return { title: 'Harvesting', subtitle: 'Harvest-ready. Best time for market and eating quality.' };
+    if (ripeness >= 50) return { title: 'Harvesting', subtitle: 'Nearly ready. Harvest soon, or monitor color and wings daily.' };
+    return { title: 'Harvesting', subtitle: 'Too early. Let it mature more before harvesting.' };
+  };
+
+  const presenceLabel = (r) => {
+    const lvl = (r?.defect_level || '').toLowerCase();
+    const status = r?.disease_status || r?.defect_description;
+    if (status) return String(status);
+    if (lvl === 'high') return 'High risk detected';
+    if (lvl === 'medium') return 'Possible issues detected';
+    return 'No visible issues detected';
+  };
+
   // --- RESULT VIEW ---
   if (scanResult) {
     const segPreviewUri =
@@ -197,6 +225,10 @@ export default function ScanScreen({ user }) {
       if (typeof q.brightness === 'number' && q.brightness < 0.08) qualityTips.push('Image is too dark. Use brighter light.');
       if (typeof q.brightness === 'number' && q.brightness > 0.98) qualityTips.push('Image is too bright. Avoid glare and direct flash.');
     }
+    const harvest = harvestingSummary(scanResult);
+    const priceModel = scanResult.price_model && typeof scanResult.price_model === 'object' ? scanResult.price_model : null;
+    const detectionSummary =
+      scanResult.detection_summary && typeof scanResult.detection_summary === 'object' ? scanResult.detection_summary : null;
 
     return (
       <View style={styles.resultContainer}>
@@ -329,6 +361,123 @@ export default function ScanScreen({ user }) {
             </Card.Content>
           </Card>
 
+          <Card style={styles.resultCard}>
+            <Card.Title title={harvest.title} />
+            <Card.Content>
+              <Paragraph style={{ color: '#666', marginBottom: 10 }}>{harvest.subtitle}</Paragraph>
+              <View style={styles.tagsContainer}>
+                <Chip icon="leaf" style={styles.chip}>
+                  Wings: {scanResult.wings_condition || '—'}
+                </Chip>
+                <Chip icon="clock" style={styles.chip}>
+                  {scanResult.shelf_life_label || '—'}
+                </Chip>
+                <Chip icon="check" style={styles.chip}>
+                  Ripeness {formatPercent(scanResult.ripeness_score)}
+                </Chip>
+              </View>
+            </Card.Content>
+          </Card>
+
+          <Card style={styles.resultCard}>
+            <Card.Title title="Sorting & Grading" />
+            <Card.Content>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Grade:</Text>
+                <Text style={styles.detailValue}>{scanResult.grade || '—'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Segmentation:</Text>
+                <Text style={styles.detailValue}>
+                  {scanResult.detection_backend === 'yolo' ? 'YOLO + Masking' : 'Masking (Heuristic)'}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Size Category:</Text>
+                <Text style={styles.detailValue}>{scanResult.size_category || '—'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Approx. Weight:</Text>
+                <Text style={styles.detailValue}>
+                  {typeof scanResult.weight_grams_est === 'number' ? `${scanResult.weight_grams_est} g` : '—'}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Color:</Text>
+                <Text style={styles.detailValue}>
+                  {scanResult.color_analysis
+                    ? `R ${scanResult.color_analysis.r} / G ${scanResult.color_analysis.g} / B ${scanResult.color_analysis.b}`
+                    : '—'}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Disease / Insects:</Text>
+                <Text style={styles.detailValue}>{presenceLabel(scanResult)}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Market Value:</Text>
+                <Text style={styles.detailValue}>
+                  {scanResult.market_value_label ? `${scanResult.market_value_label} (${scanResult.market_value_score || 0})` : '—'}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Predicted Price:</Text>
+                <Text style={styles.detailValue}>{formatPesoPerKg(scanResult.estimated_price_per_kg)}</Text>
+              </View>
+            </Card.Content>
+          </Card>
+
+          {(segPreviewUri || detectionSummary) && (
+            <Card style={styles.resultCard}>
+              <Card.Title title="Segmentation Preview" />
+              <Card.Content>
+                {segPreviewUri ? (
+                  <Image source={{ uri: segPreviewUri }} style={styles.segPreview} />
+                ) : (
+                  <Paragraph style={{ color: '#666' }}>No preview available for this scan.</Paragraph>
+                )}
+                {!!detectionSummary && (
+                  <View style={{ marginTop: 10 }}>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Detections:</Text>
+                      <Text style={styles.detailValue}>{typeof detectionSummary.count === 'number' ? detectionSummary.count : '—'}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Best Conf:</Text>
+                      <Text style={styles.detailValue}>
+                        {typeof detectionSummary.best_conf === 'number' ? detectionSummary.best_conf.toFixed(2) : '—'}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </Card.Content>
+            </Card>
+          )}
+
+          {priceModel && (
+            <Card style={styles.resultCard}>
+              <Card.Title title="Price Model" />
+              <Card.Content>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Model:</Text>
+                  <Text style={styles.detailValue}>{priceModel.type || '—'}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Samples:</Text>
+                  <Text style={styles.detailValue}>
+                    {typeof priceModel.n_samples === 'number' ? String(priceModel.n_samples) : '—'}
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>MAE:</Text>
+                  <Text style={styles.detailValue}>
+                    {typeof priceModel.mae === 'number' ? priceModel.mae.toFixed(2) : '—'}
+                  </Text>
+                </View>
+              </Card.Content>
+            </Card>
+          )}
+
           {(qualityTips.length > 0 || (q && typeof q === 'object')) && (
             <Card style={styles.resultCard}>
               <Card.Title title="Image Quality" />
@@ -412,7 +561,12 @@ export default function ScanScreen({ user }) {
   // --- CAMERA VIEW ---
   return (
     <View style={styles.container}>
-      <CameraView ref={cameraRef} style={styles.cameraPreview} facing="back" />
+      <CameraView
+        ref={cameraRef}
+        style={styles.cameraPreview}
+        facing="back"
+        enableTorch={torchEnabled}
+      />
 
       {/* Overlay */}
       <View style={styles.overlay}>
@@ -463,7 +617,19 @@ export default function ScanScreen({ user }) {
             </View>
           </TouchableOpacity>
 
-          <View style={styles.sideActionBtn} />
+          <TouchableOpacity
+            onPress={() => setTorchEnabled((v) => !v)}
+            disabled={scanning}
+            style={[styles.sideActionBtn, torchEnabled && styles.sideActionBtnActive]}
+            accessibilityRole="button"
+            accessibilityLabel={torchEnabled ? 'Turn flashlight off' : 'Turn flashlight on'}
+          >
+            <Ionicons
+              name={torchEnabled ? 'flashlight' : 'flashlight-outline'}
+              size={26}
+              color="#FFF"
+            />
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -553,6 +719,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  sideActionBtnActive: {
+    backgroundColor: 'rgba(199, 21, 133, 0.45)',
+    borderColor: 'rgba(255,255,255,0.7)',
+  },
   captureBtnOuter: {
     width: 80,
     height: 80,
@@ -635,6 +805,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 12,
     flex: 1,
+  },
+  segPreview: {
+    width: '100%',
+    height: 180,
+    borderRadius: 14,
+    backgroundColor: '#EEE',
   },
   resultCard: {
     marginBottom: 15,

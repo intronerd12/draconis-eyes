@@ -11,11 +11,13 @@ import {
 } from 'react-native';
 import { Text, Surface, Avatar, Portal, Dialog, Button, Paragraph } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { BlurView } from 'expo-blur';
+import { ScanService } from '../services/ScanService';
 
 const { width } = Dimensions.get('window');
 
@@ -48,9 +50,6 @@ const TIPS = [
   { id: 3, key: 'health', title: 'Health Benefits', icon: 'heart', color: '#55EFC4' },
 ];
 
-import { ScanService } from '../services/ScanService';
-import { useFocusEffect } from '@react-navigation/native';
-
 export default function HomeScreen({ user, onLogout }) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -72,6 +71,10 @@ export default function HomeScreen({ user, onLogout }) {
     setStats(s);
     setRecentScans(r.slice(0, 5)); // Show top 5
   };
+
+  const goToSorting = React.useCallback(() => {
+    navigation.navigate('Sorting');
+  }, [navigation]);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -292,7 +295,9 @@ export default function HomeScreen({ user, onLogout }) {
             <TouchableOpacity
               onPress={() => navigation.navigate('MappingEnvironment')}
               activeOpacity={0.8}
+              style={styles.headerPillBtn}
             >
+              <Ionicons name="open-outline" size={16} color={THEME.primary} />
               <Text style={styles.seeAllText}>Open</Text>
             </TouchableOpacity>
           </View>
@@ -352,7 +357,12 @@ export default function HomeScreen({ user, onLogout }) {
         <View style={styles.tipsSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Pro Tips</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Guide')}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Guide')}
+              activeOpacity={0.8}
+              style={styles.headerPillBtn}
+            >
+              <Ionicons name="book-outline" size={16} color={THEME.primary} />
               <Text style={styles.seeAllText}>View Guide</Text>
             </TouchableOpacity>
           </View>
@@ -379,42 +389,76 @@ export default function HomeScreen({ user, onLogout }) {
 
         {/* Recent Activity */}
         <View style={styles.recentSection}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <View style={styles.sectionHeaderTight}>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <TouchableOpacity
+              onPress={goToSorting}
+              activeOpacity={0.8}
+              style={styles.headerPillBtn}
+              accessibilityRole="button"
+              accessibilityLabel="View sorting and grading"
+            >
+              <Ionicons name="funnel-outline" size={16} color={THEME.primary} />
+              <Text style={styles.seeAllText}>View All</Text>
+            </TouchableOpacity>
+          </View>
           {recentScans.length === 0 ? (
             <Paragraph style={{ textAlign: 'center', marginTop: 20, color: THEME.textLight }}>
               No scans yet. Tap the button above to start!
             </Paragraph>
           ) : (
             recentScans.map((item, index) => (
-              <Surface key={item.id || index} style={styles.recentItem} elevation={1}>
-                <View style={styles.recentLeft}>
-                  {item.imageUri ? (
-                    <Image source={{ uri: item.imageUri }} style={styles.recentImage} />
-                  ) : (
-                    <View style={styles.recentIconBox}>
-                      <Text style={styles.emoji}>🐲</Text>
+              <TouchableOpacity
+                key={item.id || index}
+                onPress={goToSorting}
+                activeOpacity={0.88}
+                accessibilityRole="button"
+                accessibilityLabel="Open sorting and grading"
+              >
+                <Surface style={styles.recentItem} elevation={1}>
+                  <View style={styles.recentLeft}>
+                    {item.imageUri ? (
+                      <Image source={{ uri: item.imageUri }} style={styles.recentImage} />
+                    ) : (
+                      <View style={styles.recentIconBox}>
+                        <Text style={styles.emoji}>🐲</Text>
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.recentName}>
+                        {item.fruit_type ? item.fruit_type.split(' ')[0] : 'Dragon Fruit'}
+                      </Text>
+                      <Text style={styles.recentDate}>
+                        {new Date(item.timestamp).toLocaleDateString()} • {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                      <Text numberOfLines={1} style={[styles.recentDate, { color: THEME.textDark, marginTop: 2 }]}>
+                        {item.shelf_life_label || item.notes || 'No recommendation'}
+                      </Text>
                     </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.recentName}>
-                      {item.fruit_type ? item.fruit_type.split(' ')[0] : 'Dragon Fruit'}
-                    </Text>
-                    <Text style={styles.recentDate}>
-                      {new Date(item.timestamp).toLocaleDateString()} • {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                    <Text numberOfLines={1} style={[styles.recentDate, { color: THEME.textDark, marginTop: 2 }]}>
-                      {item.shelf_life_label || item.notes || 'No recommendation'}
-                    </Text>
                   </View>
-                </View>
-                <View style={styles.gradeContainer}>
-                  <Text style={[styles.gradeValue, { 
-                    color: item.grade === 'A' ? '#4CAF50' : (item.grade === 'B' ? '#FFC107' : '#FF5252') 
-                  }]}>
-                    {item.grade || '-'}
-                  </Text>
-                </View>
-              </Surface>
+
+                  <View style={styles.recentRight}>
+                    <View style={styles.gradeContainer}>
+                      <Text
+                        style={[
+                          styles.gradeValue,
+                          {
+                            color:
+                              item.grade === 'A'
+                                ? '#4CAF50'
+                                : item.grade === 'B'
+                                  ? '#FFC107'
+                                  : '#FF5252',
+                          },
+                        ]}
+                      >
+                        {item.grade || '-'}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="rgba(0,0,0,0.35)" />
+                  </View>
+                </Surface>
+              </TouchableOpacity>
             ))
           )}
         </View>
@@ -426,7 +470,7 @@ export default function HomeScreen({ user, onLogout }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.background,
+    backgroundColor: '#F6F7FB',
   },
   headerContainer: {
     height: 110, // Reduced further
@@ -706,9 +750,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 15,
   },
+  sectionHeaderTight: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: THEME.textDark,
   },
   sectionSubtitle: {
@@ -719,8 +769,19 @@ const styles = StyleSheet.create({
   },
   seeAllText: {
     color: THEME.primary,
-    fontWeight: '600',
+    fontWeight: '800',
     fontSize: 13,
+  },
+  headerPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(199, 21, 133, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(199, 21, 133, 0.14)',
   },
   tipsScroll: {
     paddingLeft: 20,
@@ -765,6 +826,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.03)',
+  },
+  recentRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexShrink: 0,
   },
   recentLeft: {
     flexDirection: 'row',

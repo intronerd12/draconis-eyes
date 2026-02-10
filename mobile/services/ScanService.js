@@ -190,6 +190,35 @@ export const ScanService = {
       return { total: 0, best: '-', avg: '0%' };
     }
   },
+
+  deleteScan: async (scanId, { user } = {}) => {
+    try {
+      const key = getStorageKey(user);
+      const currentScans = await ScanService.getScans({ user });
+      const idStr = String(scanId);
+      const idx = currentScans.findIndex((s) => String(s?.id) === idStr);
+      if (idx < 0) return { deleted: false };
+
+      const removed = currentScans[idx];
+      const updatedScans = [...currentScans.slice(0, idx), ...currentScans.slice(idx + 1)];
+      await AsyncStorage.setItem(key, JSON.stringify(updatedScans));
+
+      const uri = removed?.imageUri;
+      if (typeof uri === 'string' && uri.length > 0) {
+        try {
+          const info = await FileSystem.getInfoAsync(uri);
+          if (info.exists) {
+            await FileSystem.deleteAsync(uri, { idempotent: true });
+          }
+        } catch {}
+      }
+
+      return { deleted: true };
+    } catch (e) {
+      console.error('Error deleting scan', e);
+      throw e;
+    }
+  },
   
   // Clear all scans (for testing/debug)
   clearScans: async ({ user, deleteImages = false } = {}) => {

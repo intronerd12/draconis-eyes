@@ -70,6 +70,10 @@ def merge_many_yolo_datasets(
   if include_test:
     splits.append("test")
 
+  for ds in datasets:
+    if not ds.exists():
+      raise FileNotFoundError(f"Dataset folder not found: {ds}")
+
   _ensure_dir(out_dir)
 
   stats: dict[str, CopyStats] = {"total": CopyStats()}
@@ -116,6 +120,9 @@ def merge_many_yolo_datasets(
       "train: train/images\nval: valid/images\n\nnc: 1\nnames: ['dragon-fruit']\n",
       encoding="utf-8",
     )
+
+  if stats["total"].images <= 0:
+    raise RuntimeError("Merged dataset has 0 images. Check your source dataset folders.")
 
   return {"out_dir": str(out_dir), "stats": {k: vars(v) for k, v in stats.items()}, "data_yaml": str(data_yaml)}
 
