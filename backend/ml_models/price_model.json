@@ -1,0 +1,30 @@
+{
+  "type": "ridge_linear",
+  "target": "price_per_kg",
+  "feature_names": [
+    "intercept",
+    "quality_score",
+    "ripeness_score",
+    "defect_probability",
+    "fruit_area_ratio",
+    "color_score",
+    "grade_num",
+    "size_num"
+  ],
+  "coef": [
+    4.199999999996808,
+    3.5893302219449155e-15,
+    2.912635410633437e-14,
+    0.0,
+    2.6818006205477018e-31,
+    2.989593295135718e-16,
+    8.277783560285694e-28,
+    8.277783560285694e-28
+  ],
+  "lambda": 1.0,
+  "n_samples": 1,
+  "metrics": {
+    "mae": 0.0
+  },
+  "trained_at": "2026-02-04T00:42:47.930425+00:00"
+}

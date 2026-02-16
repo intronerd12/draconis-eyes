@@ -1,0 +1,32 @@
+node_modules/
+**/node_modules/
+.env
+.env.*
+!/frontend/.env.example
+backend/config/.env
+frontend/.env.local
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+uploads/
+backend/uploads/
+backend/training_uploads/
+backend/data/
+backend/datasets/
+backend/ml_models/yolo_runs/
+backend/ml_models/*.pt
+backend/yolov*.pt
+Dragon Fruit.yolov11/
+Dragon Fruit.yolov8/
+Dragon Fruit Vignan.v2i.yolov11/
+Dragon Fruit Vignan.v2i.yolov8/
+*.zip
+mobile/.expo/
+mobile/.expo-shared/
+mobile/dist/
+frontend/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
