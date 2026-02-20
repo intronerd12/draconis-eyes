@@ -5,8 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js",
-    "dev:no-train": "nodemon server.js",
+    "dev": "node server.js",
+    "dev:no-train": "node server.js",
     "dev:windows": "concurrently \"nodemon server.js\" \"powershell -NoProfile -ExecutionPolicy Bypass -File dev_ai.ps1\"",
     "dev:no-train:windows": "concurrently \"nodemon server.js\" \"powershell -NoProfile -ExecutionPolicy Bypass -File dev_ai.ps1 -NoTrain\"",
     "ml:install": "..\\\\.venv\\\\Scripts\\\\python.exe -m pip install -r requirements-ml.txt",
