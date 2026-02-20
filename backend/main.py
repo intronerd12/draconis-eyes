@@ -976,8 +976,12 @@ async def detect_quality(
         yolo_runtime = get_yolo_runtime("best") if callable(get_yolo_runtime) else None
         yolo_bad_runtime = get_yolo_runtime("bad") if callable(get_yolo_runtime) else None
         is_mobile_source = (str(source or "").strip().lower() == "mobile_app")
-        yolo_required = bool(require_yolo == 1 or is_mobile_source)
-        dual_yolo_required = bool(require_dual_yolo == 1 or is_mobile_source)
+        strict_mobile_requirements = (
+            str(os.environ.get("DRAGON_REQUIRE_YOLO_FOR_MOBILE", "0")).strip().lower() in ("1", "true", "yes")
+        )
+        # By default, mobile scans may fall back to heuristic mode when YOLO is unavailable.
+        yolo_required = bool(require_yolo == 1 or (is_mobile_source and strict_mobile_requirements))
+        dual_yolo_required = bool(require_dual_yolo == 1 or (is_mobile_source and strict_mobile_requirements))
         required_weights_name = str(require_weights or "yolo_best.pt").strip().lower()
         required_bad_weights_name = str(require_bad_weights or "yolo_bad.pt").strip().lower()
         active_weights_path = str(getattr(yolo_runtime, "weights_path", "") or "")

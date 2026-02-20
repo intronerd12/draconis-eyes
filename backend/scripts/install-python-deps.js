@@ -46,4 +46,11 @@ if (!ok) {
   process.exit(1);
 }
 
+// Best-effort ML install. If this fails on the platform, app can still run in heuristic mode.
+console.log('[postinstall] Installing optional ML dependencies from requirements-ml.txt ...');
+const mlOk = run(['-m', 'pip', 'install', '-r', 'requirements-ml.txt']);
+if (!mlOk) {
+  console.warn('[postinstall] Warning: ML dependencies failed to install. AI will run in fallback mode.');
+}
+
 console.log('[postinstall] Python dependencies installed.');

@@ -3,11 +3,8 @@ import { Platform } from 'react-native';
 // NOTE: For physical devices, replace 'localhost' with your machine's LAN IP address (e.g., '192.168.1.5')
 // You can find your LAN IP by running 'ipconfig' (Windows) or 'ifconfig' (Mac/Linux) in your terminal.
 const getBaseUrl = () => {
-  const ngrokUrl = 'https://3fca-2405-8d40-4c5b-6a69-a4fe-f8fc-f7fd-59a1.ngrok-free.app';
-
-  if (ngrokUrl) {
-    return ngrokUrl;
-  }
+  const productionUrl = 'https://draconis-eyes.onrender.com';
+  if (productionUrl) return productionUrl;
 
   if (Platform.OS === 'android') {
     return 'http://10.120.191.207:5000';

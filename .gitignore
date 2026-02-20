@@ -35,6 +35,12 @@ Wallpaper Dragon/
 *.pth
 *.onnx
 *.ckpt
+
+# Keep production YOLO weights in repo for Render deployment.
+!backend/ml_models/yolo_best.pt
+!backend/ml_models/yolo_bad.pt
+!backend/ml_models/yolo_best_own.pt
+!backend/ml_models/yolo_bad_own.pt
 mobile/.expo/
 mobile/.expo-shared/
 mobile/dist/
