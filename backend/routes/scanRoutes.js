@@ -6,6 +6,7 @@ const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
 const { getScans, createScan, deleteScanByLocalScanId, getScanStats, getScanAnalytics } = require('../controllers/scanController');
+const { ensureAiServiceRunning } = require('../services/aiServiceManager');
 
 // Configure Multer for temporary file storage
 const upload = multer({ dest: 'uploads/' });
@@ -42,15 +43,15 @@ router.post('/analyze', upload.single('image'), async (req, res) => {
 
   try {
     const filePath = req.file.path;
+
+    // On Render/local setups, auto-start AI service if needed.
+    await ensureAiServiceRunning({ timeoutMs: 30000 });
     
     // Create FormData for Python service
     const form = new FormData();
     form.append('file', fs.createReadStream(filePath));
     if (String(req.body?.client || '').toLowerCase() === 'mobile') {
-      form.append('require_yolo', '1');
-      form.append('require_dual_yolo', '1');
-      form.append('require_weights', 'yolo_best.pt');
-      form.append('require_bad_weights', 'yolo_bad.pt');
+      // Tag source as mobile, but do not hard-fail if YOLO runtime is not ready yet.
       form.append('source', 'mobile_app');
     }
     
@@ -73,6 +74,12 @@ router.post('/analyze', upload.single('image'), async (req, res) => {
     // Cleanup temp file if exists
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
+    }
+
+    if (error.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        message: 'AI service is starting or unavailable. Please try scanning again in a few seconds.',
+      });
     }
 
     if (error.response) {
