@@ -1,8 +1,9 @@
-import { createElement } from 'react'
+import { createElement, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, BarChart3, Camera, CheckCircle2, ClipboardList, Cpu, DollarSign, RefreshCw } from 'lucide-react'
 import MarketingFooter from '../components/marketing/MarketingFooter'
 import MarketingHeader from '../components/marketing/MarketingHeader'
+import { getRandomWallpaperSet } from '../config/wallpaperDragon'
 import './Landing.css'
 import './MarketingPages.css'
 
@@ -52,12 +53,17 @@ const DELIVERY = [
 ]
 
 function HowItWorks() {
+  const wallpapers = useMemo(() => getRandomWallpaperSet(4), [])
+
   return (
     <div className="pro-landing mk-page">
       <MarketingHeader />
 
       <main className="mk-main">
-        <section className="mk-hero">
+        <section
+          className="mk-hero df-parallax-surface df-parallax-dark"
+          style={{ '--df-bg-image': `url(${wallpapers[0].src})` }}
+        >
           <div className="container-pro mk-hero-grid">
             <div>
               <span className="mk-kicker">How the platform works</span>
@@ -107,7 +113,10 @@ function HowItWorks() {
           </div>
         </section>
 
-        <section className="mk-section">
+        <section
+          className="mk-section df-parallax-surface df-parallax-light"
+          style={{ '--df-bg-image': `url(${wallpapers[1].src})` }}
+        >
           <div className="container-pro">
             <div className="mk-section-head">
               <h2>Core workflow stages</h2>
@@ -129,7 +138,10 @@ function HowItWorks() {
           </div>
         </section>
 
-        <section className="mk-section">
+        <section
+          className="mk-section df-parallax-surface df-parallax-dark"
+          style={{ '--df-bg-image': `url(${wallpapers[2].src})` }}
+        >
           <div className="container-pro">
             <div className="mk-section-head">
               <h2>What you get after each scan</h2>
@@ -147,7 +159,10 @@ function HowItWorks() {
           </div>
         </section>
 
-        <section className="mk-section">
+        <section
+          className="mk-section df-parallax-surface df-parallax-light"
+          style={{ '--df-bg-image': `url(${wallpapers[3].src})` }}
+        >
           <div className="container-pro">
             <div className="mk-cta">
               <div>

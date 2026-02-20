@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "DragonVision",
+    "name": "Tropiscan",
     "slug": "dragon-vision",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Allow DragonVision to use your location to show local weather and improve scan context."
+        "NSLocationWhenInUseUsageDescription": "Allow Tropiscan to use your location to show local weather and improve scan context."
       }
     },
     "android": {
@@ -34,13 +34,13 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow DragonVision to access your camera to scan dragonfruits."
+          "cameraPermission": "Allow Tropiscan to access your camera to scan dragonfruits."
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow DragonVision to use your location to show local weather and improve scan context."
+          "locationWhenInUsePermission": "Allow Tropiscan to use your location to show local weather and improve scan context."
         }
       ]
     ]

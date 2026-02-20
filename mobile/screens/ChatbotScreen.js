@@ -112,7 +112,7 @@ export default function ChatbotScreen({ navigation, user }) {
           id: 'm0',
           role: 'assistant',
           text:
-            'Hi — I’m your Dragon Vision assistant. Ask me for scan tips, weather/location insights, scan stats, or account help.',
+            'Hi — I’m your Tropiscan assistant. Ask me for scan tips, weather/location insights, scan stats, or account help.',
           at: Date.now(),
         },
       ]);

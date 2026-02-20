@@ -129,8 +129,58 @@ function Auth() {
     setFormData({ name: '', email: '', password: '' })
   }
 
+  const SLIDES = [
+    { src: '/landing/slider/slide-01.jpg', alt: 'Field to market', label: 'Overview', link: '/how-it-works', cta: 'How it works' },
+    { src: '/landing/slider/slide-02.jpg', alt: 'Inspection closeup', label: 'Features', link: '/features', cta: 'See features' },
+    { src: '/landing/slider/slide-03.jpg', alt: 'Pack and export', label: 'AI Analysis', link: '/admin/AdminAiAnalysis', cta: 'Open AI' },
+  ]
+
+  const [activeSlide, setActiveSlide] = useState(0)
+
+  useEffect(() => {
+    const id = setInterval(() => setActiveSlide(s => (s + 1) % SLIDES.length), 6000)
+    return () => clearInterval(id)
+  }, [])
+
+  const goToSlide = (index) => {
+    const next = (index + SLIDES.length) % SLIDES.length
+    setActiveSlide(next)
+  }
+
+  const onSlideAction = (link) => {
+    if (link.startsWith('#')) return window.location.assign(link)
+    navigate(link)
+  }
+
   return (
     <div className="auth-container">
+      <div className="auth-slider" style={{ marginBottom: '18px' }}>
+        <div className="home-slider-shell">
+          <div className="home-slider-track">
+            {SLIDES.map((slide, idx) => (
+              <figure
+                key={slide.src}
+                className={`home-slide ${activeSlide === idx ? 'active' : ''}`}
+                aria-hidden={activeSlide === idx ? 'false' : 'true'}
+              >
+                <img src={slide.src} alt={slide.alt} />
+                <div className="home-slide-overlay">
+                  <figcaption>{slide.label}</figcaption>
+                  <button className="home-slide-btn" onClick={() => onSlideAction(slide.link)}>
+                    {slide.cta}
+                  </button>
+                </div>
+              </figure>
+            ))}
+          </div>
+          <div className="home-slider-dots">
+            {SLIDES.map((_, i) => (
+              <button key={i} className={`home-dot ${activeSlide === i ? 'active' : ''}`} onClick={() => goToSlide(i)} />
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="auth-card">
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>🌴</div>

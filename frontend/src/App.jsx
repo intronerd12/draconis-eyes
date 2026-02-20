@@ -6,6 +6,11 @@ import HowItWorks from './pages/HowItWorks'
 import Features from './pages/Features'
 import Home from './pages/Home'
 import Auth from './pages/AuthPro'
+import Overview from './pages/Overview'
+import AiAnalysis from './pages/AiAnalysis'
+import Marketplace from './pages/Marketplace'
+import UserFeatures from './pages/UserFeatures'
+import UserAdmin from './pages/UserAdmin'
 import AdminLayout from './components/admin/AdminLayout'
 import Dashboard from './pages/admin/Dashboard'
 import AdminFeatures from './pages/admin/AdminFeatures'
@@ -30,6 +35,11 @@ function App() {
         <Route path="/features" element={<Features />} />
         <Route path="/login" element={<Auth />} />
         <Route path="/home" element={<Home />} />
+        <Route path="/overview" element={<Overview />} />
+        <Route path="/user-features" element={<UserFeatures />} />
+        <Route path="/ai-analysis" element={<AiAnalysis />} />
+        <Route path="/marketplace" element={<Marketplace />} />
+        <Route path="/user-admin" element={<UserAdmin />} />
         
         {/* Admin Routes - Protected */}
         <Route element={<ProtectedRoute />}>

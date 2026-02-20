@@ -1,5 +1,6 @@
 import { ScanService } from './ScanService';
 import { getEnvironment, getEnvironmentalReport } from './EnvironmentService';
+import { API_URL } from './api';
 
 const normalize = (s) => String(s || '').trim();
 const normLower = (s) => normalize(s).toLowerCase();
@@ -186,6 +187,31 @@ export const ChatbotService = {
       };
     }
 
-    return { text: defaultHelp() };
+    try {
+      const response = await fetch(`${API_URL}/api/chatbot`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: raw,
+          user: user
+            ? {
+                name: user.name,
+                email: user.email,
+              }
+            : undefined,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data || typeof data.text !== 'string') {
+        return { text: defaultHelp() };
+      }
+
+      return { text: data.text };
+    } catch (e) {
+      return { text: defaultHelp() };
+    }
   },
 };

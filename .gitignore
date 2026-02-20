@@ -22,7 +22,19 @@ Dragon Fruit.yolov11/
 Dragon Fruit.yolov8/
 Dragon Fruit Vignan.v2i.yolov11/
 Dragon Fruit Vignan.v2i.yolov8/
+Dragon Fruit.v1i.folder/
+Own Dataset/
+Wallpaper Dragon/
 *.zip
+*.rar
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+*.pt
+*.pth
+*.onnx
+*.ckpt
 mobile/.expo/
 mobile/.expo-shared/
 mobile/dist/

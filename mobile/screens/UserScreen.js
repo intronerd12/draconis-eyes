@@ -175,7 +175,7 @@ export default function UserScreen({ navigation, user, onLogout, onUpdateUser })
           <Dialog.Title style={{ textAlign: 'center', color: THEME.primaryDark }}>Logout?</Dialog.Title>
           <Dialog.Content>
             <Paragraph style={{ textAlign: 'center', color: THEME.textLight }}>
-              Are you sure you want to log out of Dragon Vision?
+              Are you sure you want to log out of Tropiscan?
             </Paragraph>
           </Dialog.Content>
           <Dialog.Actions style={{ justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 20 }}>

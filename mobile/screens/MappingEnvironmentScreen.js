@@ -265,6 +265,14 @@ export default function MappingEnvironmentScreen({ navigation, route, user }) {
           </View>
 
           {days.length ? (
+            <View style={styles.forecastHeaderRow}>
+              <Text style={[styles.forecastHeaderText, styles.forecastDay]}>Date</Text>
+              <Text style={[styles.forecastHeaderText, styles.forecastTemp]}>Temp (C)</Text>
+              <Text style={[styles.forecastHeaderText, styles.forecastPrecip]}>Rain (mm)</Text>
+              <Text style={[styles.forecastHeaderText, styles.forecastLabel]}>Condition</Text>
+            </View>
+          ) : null}
+          {days.length ? (
             days.map((d, idx) => (
               <View key={`${d.date || idx}`} style={[styles.forecastRow, idx === 0 ? { marginTop: 4 } : null]}>
                 <Text style={styles.forecastDay}>{formatDayLabel(d.date)}</Text>
@@ -545,6 +553,20 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F2F5',
+  },
+  forecastHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8EDF2',
+  },
+  forecastHeaderText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#8B98A5',
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
   },
   forecastDay: {
     width: 60,

@@ -4,6 +4,7 @@ import { View, StyleSheet, TouchableOpacity, Dimensions, Animated, Alert, Image,
 import { Text, ActivityIndicator, Button as PaperButton, Card, Title, Paragraph, Chip, Divider, Surface } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScanService } from '../services/ScanService';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -13,6 +14,7 @@ const { width, height } = Dimensions.get('window');
 
 export default function ScanScreen({ user }) {
   const navigation = useNavigation();
+  const tabBarHeight = useBottomTabBarHeight();
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
@@ -42,6 +44,10 @@ export default function ScanScreen({ user }) {
       startScanAnimation();
     }
   }, [permission]);
+
+  useEffect(() => {
+    void ScanService.flushPendingSync({ user });
+  }, [user]);
 
   if (!permission) {
     return <View style={styles.container} />;
@@ -74,21 +80,19 @@ export default function ScanScreen({ user }) {
 
     setScanning(true);
     try {
-      // Analyze Image with simulated delay (10-20 seconds)
-      const minDelay = 10000;
-      const maxDelay = 20000;
-      const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+      const result = await ScanService.analyzeImage(imageUri);
 
-      const [result] = await Promise.all([
-        ScanService.analyzeImage(imageUri),
-        new Promise(resolve => setTimeout(resolve, delay))
-      ]);
+      const summaryNotes =
+        result?.notes ||
+        (result?.fruit_type && result?.grade
+          ? `${String(result.fruit_type)} (Grade ${String(result.grade)})`
+          : undefined);
 
-      // Save to History (scoped by user)
       const savedScan = await ScanService.addScan(
         {
           ...result,
-          imageUri, // Save local URI for display; ScanService moves it to permanent storage
+          notes: summaryNotes,
+          imageUri,
         },
         { user }
       );
@@ -96,7 +100,7 @@ export default function ScanScreen({ user }) {
       setScanResult({ ...result, imageUri: savedScan?.imageUri || imageUri });
     } catch (error) {
       console.error(error);
-      Alert.alert('Scan Error', 'Could not analyze image. Please try again.');
+      Alert.alert('Scan Error', error?.message || 'Could not analyze image. Please try again.');
     } finally {
       setScanning(false);
     }
@@ -213,17 +217,23 @@ export default function ScanScreen({ user }) {
 
   const formatPesoPerKg = (amount) => {
     const value = typeof amount === 'number' ? amount : Number(amount);
-    if (!Number.isFinite(value)) return '₱0.00/kg';
-    return `₱${value.toFixed(2)}/kg`;
+    if (!Number.isFinite(value)) return 'PHP 0.00/kg';
+    return `PHP ${value.toFixed(2)}/kg`;
   };
 
   const formatPercent = (v) => {
     const n = typeof v === 'number' ? v : Number(v);
-    if (!Number.isFinite(n)) return '—';
+    if (!Number.isFinite(n)) return '--';
     return `${Math.round(n)}%`;
   };
 
   const harvestingSummary = (r) => {
+    if (r?.harvest_stage || r?.harvest_recommendation) {
+      return {
+        title: 'Harvesting',
+        subtitle: r?.harvest_recommendation || 'Harvest status computed from ripeness and wing inspection.',
+      };
+    }
     const ripeness = typeof r?.ripeness_score === 'number' ? r.ripeness_score : Number(r?.ripeness_score);
     const defect = (r?.defect_level || '').toLowerCase();
     if (!Number.isFinite(ripeness)) return { title: 'Harvesting', subtitle: 'Not enough data to suggest harvest timing.' };
@@ -235,15 +245,6 @@ export default function ScanScreen({ user }) {
     return { title: 'Harvesting', subtitle: 'Too early. Let it mature more before harvesting.' };
   };
 
-  const presenceLabel = (r) => {
-    const lvl = (r?.defect_level || '').toLowerCase();
-    const status = r?.disease_status || r?.defect_description;
-    if (status) return String(status);
-    if (lvl === 'high') return 'High risk detected';
-    if (lvl === 'medium') return 'Possible issues detected';
-    return 'No visible issues detected';
-  };
-
   // --- RESULT VIEW ---
   if (scanResult) {
     const segPreviewUri =
@@ -251,6 +252,7 @@ export default function ScanScreen({ user }) {
         ? `data:image/jpeg;base64,${scanResult.segmentation_preview_base64}`
         : null;
 
+    const isNoFruit = scanResult.is_valid_fruit === false;
     const recommendations = Array.isArray(scanResult.recommendations) ? scanResult.recommendations : [];
     const q = scanResult.image_quality;
     const qualityTips = [];
@@ -263,6 +265,17 @@ export default function ScanScreen({ user }) {
     const priceModel = scanResult.price_model && typeof scanResult.price_model === 'object' ? scanResult.price_model : null;
     const detectionSummary =
       scanResult.detection_summary && typeof scanResult.detection_summary === 'object' ? scanResult.detection_summary : null;
+    const harvestStage = scanResult.harvest_stage || '--';
+    const harvestReadiness = formatPercent(scanResult.harvest_readiness_score);
+    const wingTipSignal =
+      typeof scanResult.wings_tip_signal === 'number' ? scanResult.wings_tip_signal.toFixed(1) : '--';
+    const insectRisk =
+      scanResult.insect_risk_level
+        ? `${String(scanResult.insect_risk_level)} (${scanResult.insect_risk_score || 0})`
+        : '--';
+    const displayGrade = isNoFruit ? 'No grade' : (scanResult.grade || '--');
+    const displayFruitType = isNoFruit ? 'No dragon fruit detected' : (scanResult.fruit_type || '--');
+    const displayNotes = isNoFruit ? 'No results.' : (scanResult.notes || '--');
 
     return (
       <View style={styles.resultContainer}>
@@ -327,17 +340,21 @@ export default function ScanScreen({ user }) {
                       styles.gradeValue,
                       {
                         color:
-                          scanResult.grade === 'A'
+                          displayGrade === 'A'
                             ? '#4CAF50'
-                            : scanResult.grade === 'B'
-                              ? '#FFC107'
-                              : scanResult.grade === 'C'
-                                ? '#FF5252'
+                            : displayGrade === 'B'
+                              ? '#8BC34A'
+                              : displayGrade === 'C'
+                                ? '#FF9800'
+                                : displayGrade === 'D'
+                                  ? '#EF5350'
+                                  : displayGrade === 'E'
+                                    ? '#D32F2F'
                                 : '#B0BEC5',
                       },
                     ]}
                   >
-                    {scanResult.grade}
+                    {displayGrade}
                   </Text>
                 </View>
                 <View style={styles.priceContainer}>
@@ -348,20 +365,26 @@ export default function ScanScreen({ user }) {
 
               <Divider style={{ marginVertical: 10 }} />
               
-              <Title style={{ fontSize: 18, marginBottom: 5 }}>{scanResult.fruit_type}</Title>
-              <Paragraph style={{ color: '#666' }}>{scanResult.notes}</Paragraph>
+              <Title style={{ fontSize: 18, marginBottom: 5 }}>{displayFruitType}</Title>
+              <Paragraph style={{ color: '#666' }}>{displayNotes}</Paragraph>
 
               <View style={styles.tagsContainer}>
-                <Chip icon="clock" style={styles.chip}>{scanResult.shelf_life_label}</Chip>
-                <Chip icon="shape" style={styles.chip}>{scanResult.size_category}</Chip>
-                {scanResult.market_value_label && (
-                  <Chip icon="tag" style={styles.chip}>{scanResult.market_value_label}</Chip>
+                {isNoFruit ? (
+                  <Chip icon="information-outline" style={styles.chip}>No recommendation</Chip>
+                ) : (
+                  <>
+                    <Chip icon="clock" style={styles.chip}>{scanResult.shelf_life_label}</Chip>
+                    <Chip icon="shape" style={styles.chip}>{scanResult.size_category}</Chip>
+                    {scanResult.market_value_label && (
+                      <Chip icon="tag" style={styles.chip}>{scanResult.market_value_label}</Chip>
+                    )}
+                  </>
                 )}
               </View>
             </Card.Content>
           </Card>
 
-          <Card style={styles.resultCard}>
+          {!isNoFruit && <Card style={styles.resultCard}>
             <Card.Title title="Detailed Analysis" />
             <Card.Content>
               <View style={styles.detailRow}>
@@ -370,7 +393,7 @@ export default function ScanScreen({ user }) {
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Sorting Lane:</Text>
-                <Text style={styles.detailValue}>{scanResult.sorting_lane || '—'}</Text>
+                <Text style={styles.detailValue}>{scanResult.sorting_lane || '--'}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Ripeness Score:</Text>
@@ -383,6 +406,18 @@ export default function ScanScreen({ user }) {
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Wings Condition:</Text>
                 <Text style={styles.detailValue}>{scanResult.wings_condition}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Wing-tip Signal:</Text>
+                <Text style={styles.detailValue}>{wingTipSignal}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Harvest Stage:</Text>
+                <Text style={styles.detailValue}>{harvestStage}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Harvest Readiness:</Text>
+                <Text style={styles.detailValue}>{harvestReadiness}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Shape Quality:</Text>
@@ -402,48 +437,60 @@ export default function ScanScreen({ user }) {
                   {scanResult.disease_status}
                 </Text>
               </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Insect Risk:</Text>
+                <Text style={styles.detailValue}>{insectRisk}</Text>
+              </View>
             </Card.Content>
-          </Card>
+          </Card>}
 
-          <Card style={styles.resultCard}>
+          {!isNoFruit && <Card style={styles.resultCard}>
             <Card.Title title={harvest.title} />
             <Card.Content>
               <Paragraph style={{ color: '#666', marginBottom: 10 }}>{harvest.subtitle}</Paragraph>
               <View style={styles.tagsContainer}>
+                <Chip icon="sprout" style={styles.chip}>
+                  {harvestStage}
+                </Chip>
                 <Chip icon="leaf" style={styles.chip}>
-                  Wings: {scanResult.wings_condition || '—'}
+                  Wings: {scanResult.wings_condition || '--'}
                 </Chip>
                 <Chip icon="clock" style={styles.chip}>
-                  {scanResult.shelf_life_label || '—'}
+                  {scanResult.shelf_life_label || '--'}
                 </Chip>
                 <Chip icon="check" style={styles.chip}>
                   Ripeness {formatPercent(scanResult.ripeness_score)}
                 </Chip>
+                <Chip icon="chart-line" style={styles.chip}>
+                  Ready {harvestReadiness}
+                </Chip>
               </View>
             </Card.Content>
-          </Card>
+          </Card>}
 
-          <Card style={styles.resultCard}>
+          {!isNoFruit && <Card style={styles.resultCard}>
             <Card.Title title="Sorting & Grading" />
             <Card.Content>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Grade:</Text>
-                <Text style={styles.detailValue}>{scanResult.grade || '—'}</Text>
+                <Text style={styles.detailValue}>{scanResult.grade || '--'}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Segmentation:</Text>
                 <Text style={styles.detailValue}>
-                  {scanResult.detection_backend === 'yolo' ? 'YOLO + Masking' : 'Masking (Heuristic)'}
+                  {scanResult.detection_backend === 'yolo_dual'
+                    ? 'YOLO (best + bad) + Masking'
+                    : (scanResult.detection_backend === 'yolo' ? 'YOLO + Masking' : 'Masking (Heuristic)')}
                 </Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Size Category:</Text>
-                <Text style={styles.detailValue}>{scanResult.size_category || '—'}</Text>
+                <Text style={styles.detailValue}>{scanResult.size_category || '--'}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Approx. Weight:</Text>
                 <Text style={styles.detailValue}>
-                  {typeof scanResult.weight_grams_est === 'number' ? `${scanResult.weight_grams_est} g` : '—'}
+                  {typeof scanResult.weight_grams_est === 'number' ? `${scanResult.weight_grams_est} g` : '--'}
                 </Text>
               </View>
               <View style={styles.detailRow}>
@@ -451,45 +498,56 @@ export default function ScanScreen({ user }) {
                 <Text style={styles.detailValue}>
                   {scanResult.color_analysis
                     ? `R ${scanResult.color_analysis.r} / G ${scanResult.color_analysis.g} / B ${scanResult.color_analysis.b}`
-                    : '—'}
+                    : '--'}
                 </Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Disease / Insects:</Text>
-                <Text style={styles.detailValue}>{presenceLabel(scanResult)}</Text>
+                <Text style={styles.detailLabel}>Harvest Stage:</Text>
+                <Text style={styles.detailValue}>{harvestStage}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Harvest Readiness:</Text>
+                <Text style={styles.detailValue}>{harvestReadiness}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Market Value:</Text>
                 <Text style={styles.detailValue}>
-                  {scanResult.market_value_label ? `${scanResult.market_value_label} (${scanResult.market_value_score || 0})` : '—'}
+                  {scanResult.market_value_label ? `${scanResult.market_value_label} (${scanResult.market_value_score || 0})` : '--'}
                 </Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Predicted Price:</Text>
                 <Text style={styles.detailValue}>{formatPesoPerKg(scanResult.estimated_price_per_kg)}</Text>
               </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Price Model:</Text>
+                <Text style={styles.detailValue}>{priceModel?.method || 'Linear progression model'}</Text>
+              </View>
             </Card.Content>
-          </Card>
+          </Card>}
 
-          {(segPreviewUri || detectionSummary) && (
+          {!!detectionSummary && !isNoFruit && (
             <Card style={styles.resultCard}>
-              <Card.Title title="Segmentation Preview" />
+              <Card.Title title="Detection Summary" />
               <Card.Content>
-                {segPreviewUri ? (
-                  <Image source={{ uri: segPreviewUri }} style={styles.segPreview} />
-                ) : (
-                  <Paragraph style={{ color: '#666' }}>No preview available for this scan.</Paragraph>
-                )}
                 {!!detectionSummary && (
                   <View style={{ marginTop: 10 }}>
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Detections:</Text>
-                      <Text style={styles.detailValue}>{typeof detectionSummary.count === 'number' ? detectionSummary.count : '—'}</Text>
+                      <Text style={styles.detailValue}>{typeof detectionSummary.count === 'number' ? detectionSummary.count : '--'}</Text>
                     </View>
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Best Conf:</Text>
                       <Text style={styles.detailValue}>
-                        {typeof detectionSummary.best_conf === 'number' ? detectionSummary.best_conf.toFixed(2) : '—'}
+                        {typeof detectionSummary.best_conf === 'number'
+                          ? `${Math.round(detectionSummary.best_conf * 100)}%`
+                          : '--'}
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Model Samples:</Text>
+                      <Text style={styles.detailValue}>
+                        {typeof priceModel?.n_samples === 'number' ? priceModel.n_samples : '--'}
                       </Text>
                     </View>
                   </View>
@@ -498,74 +556,21 @@ export default function ScanScreen({ user }) {
             </Card>
           )}
 
-          {priceModel && (
+          {qualityTips.length > 0 && !isNoFruit && (
             <Card style={styles.resultCard}>
-              <Card.Title title="Price Model" />
+              <Card.Title title="Capture Quality Tips" />
               <Card.Content>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Model:</Text>
-                  <Text style={styles.detailValue}>{priceModel.type || '—'}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Samples:</Text>
-                  <Text style={styles.detailValue}>
-                    {typeof priceModel.n_samples === 'number' ? String(priceModel.n_samples) : '—'}
-                  </Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>MAE:</Text>
-                  <Text style={styles.detailValue}>
-                    {typeof priceModel.mae === 'number' ? priceModel.mae.toFixed(2) : '—'}
-                  </Text>
-                </View>
+                {qualityTips.map((t, idx) => (
+                  <View key={`qt-${idx}`} style={styles.tipRow}>
+                    <Ionicons name="information-circle-outline" size={18} color="#0D47A1" />
+                    <Text style={styles.tipText}>{t}</Text>
+                  </View>
+                ))}
               </Card.Content>
             </Card>
           )}
 
-          {(qualityTips.length > 0 || (q && typeof q === 'object')) && (
-            <Card style={styles.resultCard}>
-              <Card.Title title="Image Quality" />
-              <Card.Content>
-                {qualityTips.length > 0 ? (
-                  qualityTips.map((t, idx) => (
-                    <View key={`qt-${idx}`} style={styles.tipRow}>
-                      <Ionicons name="information-circle-outline" size={18} color="#C71585" />
-                      <Text style={styles.tipText}>{t}</Text>
-                    </View>
-                  ))
-                ) : (
-                  <Text style={styles.tipText}>Image quality looks good.</Text>
-                )}
-                <Divider style={{ marginVertical: 10 }} />
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Brightness:</Text>
-                  <Text style={styles.detailValue}>
-                    {typeof q?.brightness === 'number' ? q.brightness.toFixed(2) : '—'}
-                  </Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Blur:</Text>
-                  <Text style={styles.detailValue}>
-                    {typeof q?.blur === 'number' ? Math.round(q.blur) : '—'}
-                  </Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Contrast:</Text>
-                  <Text style={styles.detailValue}>
-                    {typeof q?.contrast === 'number' ? q.contrast.toFixed(2) : '—'}
-                  </Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Saturation:</Text>
-                  <Text style={styles.detailValue}>
-                    {typeof q?.saturation === 'number' ? q.saturation.toFixed(2) : '—'}
-                  </Text>
-                </View>
-              </Card.Content>
-            </Card>
-          )}
-
-          {recommendations.length > 0 && (
+          {recommendations.length > 0 && !isNoFruit && (
             <Card style={styles.resultCard}>
               <Card.Title title="Recommendations & Preventive Measures" />
               <Card.Content>
@@ -650,7 +655,7 @@ export default function ScanScreen({ user }) {
 
         <Text style={styles.instruction}>Align dragonfruit within frame</Text>
 
-        <View style={styles.controlsRow}>
+        <View style={[styles.controlsRow, { marginBottom: Math.max(tabBarHeight + 18, 42) }]}>
           <TouchableOpacity
             onPress={handlePickFromGallery}
             disabled={scanning}
@@ -696,7 +701,7 @@ export default function ScanScreen({ user }) {
             <ActivityIndicator size="large" color="#C71585" style={{ marginBottom: 20 }} />
             <Title style={styles.loadingTitle}>Analyzing Image...</Title>
             <Text style={styles.loadingText}>Our AI is examining your Dragon Fruit.</Text>
-            <Text style={styles.loadingSubText}>This may take 10-20 seconds.</Text>
+            <Text style={styles.loadingSubText}>Please wait while sorting and grading are computed.</Text>
           </Surface>
         </View>
       )}
@@ -873,12 +878,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 12,
     flex: 1,
-  },
-  segPreview: {
-    width: '100%',
-    height: 180,
-    borderRadius: 14,
-    backgroundColor: '#EEE',
   },
   resultCard: {
     marginBottom: 15,

@@ -80,7 +80,8 @@ export default function SortingGradingScreen({ user }) {
           <Dialog.Title style={{ color: '#111' }}>Delete this scan?</Dialog.Title>
           <Dialog.Content>
             <Paragraph style={{ color: '#555' }}>
-              This removes the scan from your history and deletes its saved image on this device.
+              This removes the scan from your history, deletes its saved image on this device,
+              and removes the synced record from admin data.
             </Paragraph>
           </Dialog.Content>
           <Dialog.Actions style={{ paddingHorizontal: 14, paddingBottom: 12 }}>

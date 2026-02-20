@@ -1,145 +1,154 @@
-# Training on Google Colab (via Google Drive)
+# Colab Training (Own Unhealthy Dataset)
 
-Since you uploaded the data to Google Drive, follow these steps to train your model using the GPU.
+Use this for your local folder dataset:
+- `Own Dataset/not healthy dragon`
 
-## Step 1: Open Google Colab
-1. Go to [Google Colab](https://colab.research.google.com/).
-2. Click **New Notebook**.
-3. In the menu, go to **Runtime** > **Change runtime type**.
-4. Select **T4 GPU** and click **Save**.
+Target output:
+- `yolo_bad_own.pt`
 
-## Step 2: Run the Training Code
-Copy and paste the following code into the first cell of your notebook and run it (Shift+Enter).
-This code will:
-1. Mount your Google Drive.
-2. Unzip the file from `/content/drive/MyDrive/DragonFruit/colab_upload.zip`.
-3. Train the YOLOv8 model on the 2226 images.
-4. Download the best model to your computer.
+## 1) Create The Zip Locally
+Run:
 
-```python
-# 1. Mount Google Drive
-from google.colab import drive
-print("Mounting Google Drive...")
-drive.mount('/content/drive')
-
-# 2. Install Dependencies
-!pip install ultralytics
-
-# 3. Unzip Data from Drive
-import zipfile
-import os
-import yaml
-from ultralytics import YOLO
-
-# The path you provided (Updated to your specific zip file)
-# Make sure you upload "Dragon Fruit Vignan.v2i.yolov8.zip" to this folder in Drive
-zip_path = "/content/drive/MyDrive/DragonFruit/Dragon Fruit Vignan.v2i.yolov8.zip"
-
-print(f"Unzipping data from {zip_path}...")
-if os.path.exists(zip_path):
-    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-        zip_ref.extractall(".")
-else:
-    raise FileNotFoundError(f"Could not find file at {zip_path}. Please check the path.")
-
-# 4. Train Model (Self-Contained Script)
-# This script automatically finds your dataset and trains the model, 
-# even if the folder structure is different or files are missing.
-
-from ultralytics import YOLO
-import yaml
-
-# Search for data.yaml to locate the dataset
-print("Searching for data.yaml (skipping system folders)...")
-dataset_yaml = None
-
-# Optimization: check current directory first
-if os.path.exists("data.yaml"):
-    dataset_yaml = os.path.abspath("data.yaml")
-    print(f"Found dataset configuration at: {dataset_yaml}")
-
-# Optimization: check immediate subdirectories
-if not dataset_yaml:
-    for d in os.listdir("."):
-        p = os.path.join(".", d)
-        if os.path.isdir(p) and "data.yaml" in os.listdir(p):
-             dataset_yaml = os.path.abspath(os.path.join(p, "data.yaml"))
-             print(f"Found dataset configuration at: {dataset_yaml}")
-             break
-
-# Full walk if not found yet (excluding heavy folders)
-if not dataset_yaml:
-    exclude_dirs = {'node_modules', '.git', 'venv', 'env', '__pycache__', 'runs', 'yolo_runs'}
-    for root, dirs, files in os.walk("."):
-        # Modify dirs in-place to skip unwanted directories
-        dirs[:] = [d for d in dirs if d not in exclude_dirs]
-        
-        if "data.yaml" in files:
-            # Check if this looks like the correct dataset (has train/valid folders nearby)
-            if "train" in dirs or "valid" in dirs or os.path.exists(os.path.join(root, "train")):
-                dataset_yaml = os.path.abspath(os.path.join(root, "data.yaml"))
-                print(f"Found dataset configuration at: {dataset_yaml}")
-                break
-            # Fallback candidate if structure is weird
-            elif not dataset_yaml:
-                 dataset_yaml = os.path.abspath(os.path.join(root, "data.yaml"))
-
-if not dataset_yaml:
-    print("Could not find 'data.yaml'. Listing top-level directories to help debug:")
-    print(os.listdir("."))
-    raise FileNotFoundError("Could not find 'data.yaml' in the unzipped files. Please check your zip file contents.")
-
-# Fix paths in data.yaml if necessary (make them absolute to avoid errors)
-with open(dataset_yaml, 'r') as f:
-    data_config = yaml.safe_load(f)
-
-# Ensure paths are absolute
-base_dir = os.path.dirname(dataset_yaml)
-if 'path' not in data_config:
-    data_config['path'] = base_dir # YOLOv8 uses 'path' as base
-else:
-    # If path is defined but relative, make it absolute
-    if not os.path.isabs(data_config['path']):
-         data_config['path'] = os.path.abspath(os.path.join(base_dir, data_config['path']))
-
-# Write back the corrected yaml
-with open(dataset_yaml, 'w') as f:
-    yaml.dump(data_config, f)
-
-print("Starting training with YOLOv8s...")
-# Load a model
-model = YOLO("yolov8s.pt")  # load a pretrained model (recommended for training)
-
-# Train the model
-# epochs=30 (as requested)
-results = model.train(data=dataset_yaml, epochs=30, imgsz=640, device=0)
-
-# 5. Download Result
-from google.colab import files
-
-# Find the best.pt file
-# Ultralytics saves to runs/detect/train/weights/best.pt by default
-# But if multiple runs, it might be train2, train3, etc.
-runs_dir = "runs/detect"
-if os.path.exists(runs_dir):
-    runs = [os.path.join(runs_dir, d) for d in os.listdir(runs_dir) if os.path.isdir(os.path.join(runs_dir, d))]
-    runs.sort(key=os.path.getmtime, reverse=True)
-    
-    if runs:
-        best_pt = os.path.join(runs[0], "weights", "best.pt")
-        if os.path.exists(best_pt):
-            print(f"Downloading model from: {best_pt}")
-            files.download(best_pt)
-        else:
-            print(f"Model file not found at {best_pt}")
-    else:
-        print("No training runs found.")
-else:
-    print("No runs directory found.")
+```powershell
+.\prepare_own_bad_zip.ps1
 ```
 
-## Step 3: Install the New Model
-1. Once the file `best.pt` downloads, rename it to `yolo_best.pt`.
-2. Move it to your local project folder:
-   `C:\Users\Sachzie\Downloads\dragons-vision\backend\ml_models\yolo_best.pt`
-3. Restart your backend server.
+This creates:
+- `own_not_healthy_dragon_v2.zip`
+
+## 2) Upload To Google Drive
+Upload `own_not_healthy_dragon_v2.zip` to:
+- `/content/drive/MyDrive/DragonFruit/own_not_healthy_dragon_v2.zip`
+
+Optional (for fine-tuning from your existing model):
+- `/content/drive/MyDrive/DragonFruit/yolo_best.pt`
+
+## 3) Paste This Single Cell In Colab
+Set Colab runtime to GPU first (`Runtime` -> `Change runtime type` -> `T4 GPU`), then run:
+
+```python
+from google.colab import drive, files
+drive.mount("/content/drive")
+
+!pip -q install ultralytics pyyaml
+
+import hashlib
+import random
+import shutil
+import zipfile
+from pathlib import Path
+
+import yaml
+from ultralytics import YOLO
+
+# ================== CONFIG ==================
+ZIP_PATH = Path("/content/drive/MyDrive/DragonFruit/own_not_healthy_dragon_v2.zip")
+BASE_WEIGHTS = Path("/content/drive/MyDrive/DragonFruit/yolo_best.pt")  # optional
+CLASS_NAME = "not_healthy_dragon"
+
+EPOCHS = 30
+IMGSZ = 640
+BATCH = 16
+DEVICE = 0  # GPU 0. Use "cpu" if no GPU.
+
+VAL_RATIO = 0.2
+SEED = 42
+
+RUN_NAME = "dragon_bad_own"
+RUNS_PROJECT = Path("/content/runs/detect")
+OUT_WEIGHTS = Path("/content/yolo_bad_own.pt")
+# ============================================
+
+if not ZIP_PATH.exists():
+    raise FileNotFoundError(f"Zip not found: {ZIP_PATH}")
+
+work_root = Path("/content/dragon_bad_own_workspace")
+raw_dir = work_root / "raw"
+yolo_dir = work_root / "yolo"
+run_dir = RUNS_PROJECT / RUN_NAME
+
+for p in (work_root, run_dir):
+    if p.exists():
+        shutil.rmtree(p)
+
+raw_dir.mkdir(parents=True, exist_ok=True)
+
+with zipfile.ZipFile(ZIP_PATH, "r") as zf:
+    zf.extractall(raw_dir)
+
+img_exts = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+all_images = [p for p in raw_dir.rglob("*") if p.is_file() and p.suffix.lower() in img_exts]
+
+if not all_images:
+    raise RuntimeError("No images found in zip.")
+
+random.seed(SEED)
+random.shuffle(all_images)
+
+val_count = int(round(len(all_images) * VAL_RATIO))
+val_count = max(1, min(val_count, len(all_images) - 1))
+val_images = all_images[:val_count]
+train_images = all_images[val_count:]
+
+for split in ("train", "val"):
+    (yolo_dir / split / "images").mkdir(parents=True, exist_ok=True)
+    (yolo_dir / split / "labels").mkdir(parents=True, exist_ok=True)
+
+def safe_name(text: str) -> str:
+    out = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in text)
+    return out.strip("._-") or "img"
+
+def write_sample(src_img: Path, split: str) -> None:
+    digest = hashlib.sha1(str(src_img).encode("utf-8")).hexdigest()[:10]
+    img_name = f"{safe_name(src_img.stem)}_{digest}{src_img.suffix.lower()}"
+    dst_img = yolo_dir / split / "images" / img_name
+    dst_lbl = yolo_dir / split / "labels" / f"{Path(img_name).stem}.txt"
+
+    shutil.copy2(src_img, dst_img)
+    # Full-image pseudo box: class x_center y_center width height
+    dst_lbl.write_text("0 0.5 0.5 1.0 1.0\n", encoding="utf-8")
+
+for p in train_images:
+    write_sample(p, "train")
+for p in val_images:
+    write_sample(p, "val")
+
+data_yaml = yolo_dir / "data.yaml"
+data = {
+    "path": str(yolo_dir),
+    "train": "train/images",
+    "val": "val/images",
+    "nc": 1,
+    "names": [CLASS_NAME],
+}
+data_yaml.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+weights = str(BASE_WEIGHTS) if BASE_WEIGHTS.exists() else "yolov8s.pt"
+print(f"Starting weights: {weights}")
+print(f"Train images: {len(train_images)}, Val images: {len(val_images)}")
+
+model = YOLO(weights)
+results = model.train(
+    data=str(data_yaml),
+    epochs=EPOCHS,
+    imgsz=IMGSZ,
+    batch=BATCH,
+    device=DEVICE,
+    project=str(RUNS_PROJECT),
+    name=RUN_NAME,
+    exist_ok=False,
+)
+
+best_pt = Path(results.save_dir) / "weights" / "best.pt"
+if not best_pt.exists():
+    raise FileNotFoundError(f"Training finished but best.pt missing: {best_pt}")
+
+shutil.copy2(best_pt, OUT_WEIGHTS)
+print(f"Saved final model: {OUT_WEIGHTS}")
+files.download(str(OUT_WEIGHTS))
+```
+
+## Notes
+- This dataset has image-level class only (no real boxes). The cell creates full-image pseudo boxes so YOLO training can run.
+- Keep `EPOCHS = 30` as requested.
+- If training fails due memory, reduce `BATCH` from `16` to `8`.

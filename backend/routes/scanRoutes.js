@@ -5,7 +5,7 @@ const multer = require('multer');
 const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
-const { getScans, createScan, getScanStats } = require('../controllers/scanController');
+const { getScans, createScan, deleteScanByLocalScanId, getScanStats, getScanAnalytics } = require('../controllers/scanController');
 
 // Configure Multer for temporary file storage
 const upload = multer({ dest: 'uploads/' });
@@ -20,9 +20,17 @@ router.get('/', getScans);
 // @route   POST /api/scan
 router.post('/', createScan);
 
+// @desc    Delete a scan by local scan id
+// @route   DELETE /api/scan/:localScanId
+router.delete('/:localScanId', deleteScanByLocalScanId);
+
 // @desc    Get scan statistics
 // @route   GET /api/scan/stats
 router.get('/stats', getScanStats);
+
+// @desc    Get scan analytics payload
+// @route   GET /api/scan/analytics
+router.get('/analytics', getScanAnalytics);
 
 // @desc    Analyze dragon fruit image
 // @route   POST /api/scan/analyze
@@ -38,6 +46,13 @@ router.post('/analyze', upload.single('image'), async (req, res) => {
     // Create FormData for Python service
     const form = new FormData();
     form.append('file', fs.createReadStream(filePath));
+    if (String(req.body?.client || '').toLowerCase() === 'mobile') {
+      form.append('require_yolo', '1');
+      form.append('require_dual_yolo', '1');
+      form.append('require_weights', 'yolo_best.pt');
+      form.append('require_bad_weights', 'yolo_bad.pt');
+      form.append('source', 'mobile_app');
+    }
     
     // Forward to Python Service
     const response = await axios.post(`${PYTHON_SERVICE_URL}/detect`, form, {

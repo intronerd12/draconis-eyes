@@ -1,8 +1,10 @@
-import { createElement } from 'react'
+import { createElement, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, CheckCircle2, Gauge, Layers, ShieldCheck, Sprout, TrendingUp } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Crown, Gauge, Layers, ShieldCheck, Sprout, TrendingUp } from 'lucide-react'
 import MarketingFooter from '../components/marketing/MarketingFooter'
 import MarketingHeader from '../components/marketing/MarketingHeader'
+import ParallaxDatasetSection from '../components/marketing/ParallaxDatasetSection'
+import { getRandomWallpaperSet } from '../config/wallpaperDragon'
 import './Landing.css'
 import './MarketingPages.css'
 
@@ -52,13 +54,42 @@ const PIPELINE = [
   },
 ]
 
+const TEAM_MEMBERS = [
+  {
+    name: 'Adora, Joenabelle',
+    role: 'Member',
+    description: 'Supports dataset preparation and quality checks to keep training inputs consistent and reliable.',
+  },
+  {
+    name: 'Bumatay, Axel Jillian',
+    role: 'Leader',
+    description: 'Leads project direction, coordinates delivery priorities, and aligns technical work across the group.',
+    isLeader: true,
+  },
+  {
+    name: 'Danque, John Michael',
+    role: 'Member',
+    description: 'Contributes to model workflow execution and helps validate behavior across key grading scenarios.',
+  },
+  {
+    name: 'Landas, Davimher',
+    role: 'Member',
+    description: 'Supports implementation and testing to maintain a dependable and professional user experience.',
+  },
+]
+
 function About() {
+  const wallpapers = useMemo(() => getRandomWallpaperSet(6), [])
+
   return (
     <div className="pro-landing mk-page">
       <MarketingHeader />
 
       <main className="mk-main">
-        <section className="mk-hero">
+        <section
+          className="mk-hero df-parallax-surface df-parallax-dark"
+          style={{ '--df-bg-image': `url(${wallpapers[0].src})` }}
+        >
           <div className="container-pro mk-hero-grid">
             <div>
               <span className="mk-kicker">About our platform</span>
@@ -114,7 +145,10 @@ function About() {
           </div>
         </section>
 
-        <section className="mk-section">
+        <section
+          className="mk-section df-parallax-surface df-parallax-light"
+          style={{ '--df-bg-image': `url(${wallpapers[1].src})` }}
+        >
           <div className="container-pro">
             <div className="mk-section-head">
               <h2>What defines our approach</h2>
@@ -135,7 +169,10 @@ function About() {
           </div>
         </section>
 
-        <section className="mk-section">
+        <section
+          className="mk-section df-parallax-surface df-parallax-dark"
+          style={{ '--df-bg-image': `url(${wallpapers[2].src})` }}
+        >
           <div className="container-pro">
             <div className="mk-section-head">
               <h2>Model lifecycle and governance</h2>
@@ -157,7 +194,52 @@ function About() {
           </div>
         </section>
 
-        <section className="mk-section">
+        <section
+          className="mk-section mk-team-section df-parallax-surface df-parallax-light"
+          style={{ '--df-bg-image': `url(${wallpapers[3].src})` }}
+        >
+          <div className="container-pro">
+            <div className="mk-section-head">
+              <h2>Our Team</h2>
+              <p>
+                A focused group building practical AI tools for real-world dragon fruit grading workflows.
+              </p>
+            </div>
+            <div className="mk-team-grid">
+              {TEAM_MEMBERS.map((member) => (
+                <article key={member.name} className={`mk-team-card${member.isLeader ? ' is-leader' : ''}`}>
+                  <div className="mk-team-top">
+                    <span className="mk-team-role">{member.role}</span>
+                    {member.isLeader && (
+                      <span className="mk-leader-badge">
+                        <Crown size={14} />
+                        Group Leader
+                      </span>
+                    )}
+                  </div>
+                  <h3>{member.name}</h3>
+                  <p>{member.description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <ParallaxDatasetSection
+          sectionId="comp-about-vignan-parallax"
+          kicker="Wallpaper Dragon Collection"
+          title="Randomized Dragon Fruit Image Wall"
+          description="A large visual section that rotates through Wallpaper Dragon images with smooth parallax movement while scrolling."
+          images={wallpapers}
+          primaryAction={{ label: 'Explore Features', to: '/features' }}
+          secondaryAction={{ label: 'See How It Works', to: '/how-it-works' }}
+          height={730}
+        />
+
+        <section
+          className="mk-section df-parallax-surface df-parallax-dark"
+          style={{ '--df-bg-image': `url(${wallpapers[4].src})` }}
+        >
           <div className="container-pro">
             <div className="mk-cta">
               <div>

@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 // NOTE: For physical devices, replace 'localhost' with your machine's LAN IP address (e.g., '192.168.1.5')
 // You can find your LAN IP by running 'ipconfig' (Windows) or 'ifconfig' (Mac/Linux) in your terminal.
 const getBaseUrl = () => {
-  const ngrokUrl = 'https://af5a-2405-8d40-4078-fa2d-9552-a4e5-b5aa-3900.ngrok-free.app';
+  const ngrokUrl = 'https://3fca-2405-8d40-4c5b-6a69-a4fe-f8fc-f7fd-59a1.ngrok-free.app';
 
   if (ngrokUrl) {
     return ngrokUrl;

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+  <defs>
+    <g id="fruit">
+      <ellipse cx="40" cy="40" rx="28" ry="36" fill="#e71d73" />
+      <g transform="translate(0,-18)" fill="#23b28a">
+        <path d="M40 4c4 6 10 10 18 10s14-4 18-10c-6 2-10 6-18 6s-12-4-18-6z" />
+      </g>
+    </g>
+    <pattern id="p" patternUnits="userSpaceOnUse" width="160" height="160">
+      <rect width="160" height="160" fill="rgba(255,255,255,0)" />
+      <use href="#fruit" x="20" y="20" opacity="0.08" />
+      <use href="#fruit" x="90" y="90" opacity="0.06" transform="scale(0.9)" />
+      <circle cx="120" cy="40" r="6" fill="#ffd1e6" opacity="0.05" />
+      <circle cx="40" cy="120" r="4" fill="#dff7ee" opacity="0.04" />
+    </pattern>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#p)" />
+</svg>

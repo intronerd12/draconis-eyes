@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import BrandMark from '../components/BrandMark'
+import MarketingFooter from '../components/marketing/MarketingFooter'
 import { BRAND_NAME } from '../config/brand'
 
 function Resources() {
@@ -61,14 +62,7 @@ function Resources() {
         </section>
       </main>
 
-      <footer className="landing-footer">
-        <div className="container-pro">
-          <div className="landing-footer-bottom">
-            <div>© {new Date().getFullYear()} {BRAND_NAME}. All rights reserved.</div>
-            <Link to="/login" className="landing-footer-login">Login</Link>
-          </div>
-        </div>
-      </footer>
+      <MarketingFooter />
     </div>
   )
 }

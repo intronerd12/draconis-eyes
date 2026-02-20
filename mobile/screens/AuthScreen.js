@@ -200,10 +200,10 @@ export default function AuthScreen({ onLogin }) {
         >
           {/* Header Content */}
           <View style={styles.headerContent}>
-            <View style={styles.iconContainer}>
+          <View style={styles.iconContainer}>
               <Text style={{ fontSize: 48 }}>🐲</Text>
             </View>
-            <Text style={styles.appTitle}>Dragon Vision</Text>
+            <Text style={styles.appTitle}>Tropiscan</Text>
             <Text style={styles.appTagline}>Identify. Analyze. Grade.</Text>
           </View>
 

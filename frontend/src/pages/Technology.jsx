@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import BrandMark from '../components/BrandMark'
+import MarketingFooter from '../components/marketing/MarketingFooter'
 import { BRAND_NAME } from '../config/brand'
 
 function Technology() {
@@ -36,8 +37,8 @@ function Technology() {
               <p className="landing-section-subtitle">Built with modern, open-source, and enterprise-grade technology for reliability and scalability.</p>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '24px' }}>
-              <div style={{ padding: '20px', backgroundColor: '#f3f4f6', borderRadius: '8px', border: '1px solid #d1d5db' }}>
+            <div className="tech-stack-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '24px' }}>
+              <div className="tech-stack-card" style={{ padding: '20px', backgroundColor: '#f3f4f6', borderRadius: '8px', border: '1px solid #d1d5db' }}>
                 <div style={{ fontSize: '14px', fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
                   Backend
                 </div>
@@ -49,7 +50,7 @@ function Technology() {
                 </ul>
               </div>
 
-              <div style={{ padding: '20px', backgroundColor: '#f3f4f6', borderRadius: '8px', border: '1px solid #d1d5db' }}>
+              <div className="tech-stack-card" style={{ padding: '20px', backgroundColor: '#f3f4f6', borderRadius: '8px', border: '1px solid #d1d5db' }}>
                 <div style={{ fontSize: '14px', fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
                   Frontend
                 </div>
@@ -61,7 +62,7 @@ function Technology() {
                 </ul>
               </div>
 
-              <div style={{ padding: '20px', backgroundColor: '#f3f4f6', borderRadius: '8px', border: '1px solid #d1d5db' }}>
+              <div className="tech-stack-card" style={{ padding: '20px', backgroundColor: '#f3f4f6', borderRadius: '8px', border: '1px solid #d1d5db' }}>
                 <div style={{ fontSize: '14px', fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
                   AI &amp; ML
                 </div>
@@ -73,7 +74,7 @@ function Technology() {
                 </ul>
               </div>
 
-              <div style={{ padding: '20px', backgroundColor: '#f3f4f6', borderRadius: '8px', border: '1px solid #d1d5db' }}>
+              <div className="tech-stack-card" style={{ padding: '20px', backgroundColor: '#f3f4f6', borderRadius: '8px', border: '1px solid #d1d5db' }}>
                 <div style={{ fontSize: '14px', fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
                   Data &amp; Services
                 </div>
@@ -89,14 +90,7 @@ function Technology() {
         </section>
       </main>
 
-      <footer className="landing-footer">
-        <div className="container-pro">
-          <div className="landing-footer-bottom">
-            <div>© {new Date().getFullYear()} {BRAND_NAME}. All rights reserved.</div>
-            <Link to="/login" className="landing-footer-login">Login</Link>
-          </div>
-        </div>
-      </footer>
+      <MarketingFooter />
     </div>
   )
 }
