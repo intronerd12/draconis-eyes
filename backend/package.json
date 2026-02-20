@@ -4,9 +4,10 @@
   "description": "Backend for Dragon Vision",
   "main": "server.js",
   "scripts": {
+    "postinstall": "node scripts/install-python-deps.js",
     "start": "node server.js",
-    "dev": "node server.js",
-    "dev:no-train": "node server.js",
+    "dev": "node render-start.js",
+    "dev:no-train": "node render-start.js --no-train",
     "dev:windows": "concurrently \"nodemon server.js\" \"powershell -NoProfile -ExecutionPolicy Bypass -File dev_ai.ps1\"",
     "dev:no-train:windows": "concurrently \"nodemon server.js\" \"powershell -NoProfile -ExecutionPolicy Bypass -File dev_ai.ps1 -NoTrain\"",
     "ml:install": "..\\\\.venv\\\\Scripts\\\\python.exe -m pip install -r requirements-ml.txt",
