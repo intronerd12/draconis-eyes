@@ -1,17 +1,22 @@
 const { spawn, spawnSync } = require('child_process');
-const path = require('path');
 
 const root = __dirname;
 const args = process.argv.slice(2);
 const noTrain = args.includes('--no-train');
 
 const detectPython = () => {
-  const candidates = ['python3', 'python', 'py'];
+  const candidates = process.platform === 'win32'
+    ? ['python', 'py']
+    : ['python3', 'python'];
+
+  console.log(`[render-start] Detecting python runtime (${process.platform})...`);
   for (const cmd of candidates) {
     const checkArgs = cmd === 'py' ? ['-3', '--version'] : ['--version'];
     try {
-      const out = spawnSync(cmd, checkArgs, { stdio: 'pipe' });
+      const out = spawnSync(cmd, checkArgs, { stdio: 'pipe', timeout: 3000 });
       if (out.status === 0) {
+        const version = String(out.stdout || out.stderr || '').trim();
+        console.log(`[render-start] Python detected: ${cmd} ${version}`);
         if (cmd === 'py') return { cmd, baseArgs: ['-3'] };
         return { cmd, baseArgs: [] };
       }
@@ -30,12 +35,14 @@ const env = { ...process.env };
 env.PYTHONUNBUFFERED = '1';
 if (noTrain) env.DRAGON_AUTO_TRAIN = '0';
 
+console.log('[render-start] Starting Node API (server.js)...');
 const nodeProc = spawn('node', ['server.js'], {
   cwd: root,
   env,
   stdio: 'inherit',
 });
 
+console.log('[render-start] Starting AI service (uvicorn main:app on 127.0.0.1:8000)...');
 const aiArgs = [...py.baseArgs, '-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', '8000'];
 const aiProc = spawn(py.cmd, aiArgs, {
   cwd: root,

@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "postinstall": "node scripts/install-python-deps.js",
-    "start": "node server.js",
+    "start": "node render-start.js",
     "dev": "node render-start.js",
     "dev:no-train": "node render-start.js --no-train",
     "dev:windows": "concurrently \"nodemon server.js\" \"powershell -NoProfile -ExecutionPolicy Bypass -File dev_ai.ps1\"",
