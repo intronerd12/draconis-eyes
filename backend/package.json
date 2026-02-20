@@ -5,8 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "concurrently \"nodemon server.js\" \"powershell -NoProfile -ExecutionPolicy Bypass -File dev_ai.ps1\"",
-    "dev:no-train": "concurrently \"nodemon server.js\" \"powershell -NoProfile -ExecutionPolicy Bypass -File dev_ai.ps1 -NoTrain\"",
+    "dev": "nodemon server.js",
+    "dev:no-train": "nodemon server.js",
+    "dev:windows": "concurrently \"nodemon server.js\" \"powershell -NoProfile -ExecutionPolicy Bypass -File dev_ai.ps1\"",
+    "dev:no-train:windows": "concurrently \"nodemon server.js\" \"powershell -NoProfile -ExecutionPolicy Bypass -File dev_ai.ps1 -NoTrain\"",
     "ml:install": "..\\\\.venv\\\\Scripts\\\\python.exe -m pip install -r requirements-ml.txt",
     "train:full": "..\\\\.venv\\\\Scripts\\\\python.exe train_full.py --device cpu --cache --cos-lr",
     "train:self": "..\\\\.venv\\\\Scripts\\\\python.exe selftrain_pipeline.py --device cpu --pseudo-limit 100",

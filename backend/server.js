@@ -30,7 +30,7 @@ app.use(express.json());
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/scan', require('./routes/scanRoutes'));
-app.use('/api/weather', require('./routes/weatherRoutes'));
+app.use('/api/weather', require('./routes/weatherroutes'));
 app.use('/api/train', require('./routes/trainRoutes'));
 app.use('/api/chatbot', require('./routes/chatbotRoutes'));
 
