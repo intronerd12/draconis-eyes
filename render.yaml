@@ -43,3 +43,6 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     autoDeploy: true
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://dragon-backend.onrender.com
