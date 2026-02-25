@@ -1,5 +1,5 @@
 import React, { createElement, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   ArrowRight,
   BarChart3,
@@ -142,10 +142,8 @@ const MODULES = [
 ]
 
 function Landing() {
-  const navigate = useNavigate()
   const [activeVideoSlide, setActiveVideoSlide] = useState(0)
   const [isPlaying, setIsPlaying] = useState(true)
-  const [activeSlide, setActiveSlide] = useState(0)
   const videoRefs = useRef([])
   const wallpapers = useMemo(() => getRandomWallpaperSet(6), [])
 
@@ -158,19 +156,10 @@ function Landing() {
     return () => window.clearInterval(intervalId)
   }, [isPlaying])
 
-  const goToSlide = (index) => {
-    const nextIndex = (index + SLIDES.length) % SLIDES.length
-    setActiveSlide(nextIndex)
-  }
-
   const goToVideoSlide = (index) => {
     const nextIndex = (index + VIDEO_SLIDES.length) % VIDEO_SLIDES.length
     setActiveVideoSlide(nextIndex)
     setIsPlaying(true)
-  }
-
-  const handleSlideClick = (link) => {
-    navigate(link)
   }
 
   const toggleVideoPlay = () => {
@@ -188,8 +177,8 @@ function Landing() {
         } else {
           v.pause()
         }
-      } catch (e) {
-        // ignore play/pause errors from browser autoplay policies
+      } catch (_err) {
+        void _err
       }
     })
   }, [activeVideoSlide, isPlaying])

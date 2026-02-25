@@ -137,7 +137,25 @@ export const ChatbotService = {
             });
           }
 
-          return { text: lines.join('\n') };
+          return {
+            text: lines.join('\n'),
+            card: {
+              type: 'forecast',
+              title: '7-day forecast',
+              place,
+              now: {
+                temperature: formatTemp(cur?.temperatureC),
+                conditions: cur?.weatherLabel || '—',
+                wind: formatWind(cur?.windKmh),
+              },
+              days: days.map((d) => ({
+                date: d.date ? new Date(d.date).toLocaleDateString() : '—',
+                label: d.weatherLabel || '—',
+                tempRange: `${formatTemp(d.minTempC)}–${formatTemp(d.maxTempC)}`,
+                rain: typeof d.precipitationMm === 'number' ? `${Math.round(d.precipitationMm)} mm` : '—',
+              })),
+            },
+          };
         }
 
         const env = await getEnvironment({ force: true, user });
@@ -157,6 +175,19 @@ export const ChatbotService = {
             '',
             'Tip: Ask “7-day forecast” for a longer outlook.',
           ].filter(Boolean).join('\n'),
+          card: {
+            type: 'weather',
+            title: 'Weather now',
+            place,
+            metrics: [
+              { label: 'Temperature', value: formatTemp(w?.temperatureC) },
+              { label: 'Conditions', value: w?.weatherLabel || '—' },
+              { label: 'Wind', value: formatWind(w?.windKmh) },
+              coords?.latitude && coords?.longitude
+                ? { label: 'Coordinates', value: `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}` }
+                : null,
+            ].filter(Boolean),
+          },
         };
       } catch (e) {
         return {

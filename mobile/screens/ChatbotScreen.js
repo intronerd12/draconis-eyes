@@ -177,7 +177,10 @@ export default function ChatbotScreen({ navigation, user }) {
     try {
       await new Promise((r) => setTimeout(r, 350));
       const res = await ChatbotService.reply({ message: trimmed, user });
-      setMessages((prev) => [...prev, { id: makeId(), role: 'assistant', text: res.text, at: Date.now() }]);
+      setMessages((prev) => [
+        ...prev,
+        { id: makeId(), role: 'assistant', text: res.text, card: res.card, at: Date.now() },
+      ]);
 
       if (res?.action?.type === 'navigate' && res.action.screen) {
         const parentNav = navigation?.getParent?.();
@@ -199,6 +202,81 @@ export default function ChatbotScreen({ navigation, user }) {
     }
   };
 
+  const ForecastCard = ({ card }) => {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>{card.title}</Text>
+        <Text style={styles.cardSubtitle}>{card.place}</Text>
+        <View style={styles.cardNowRow}>
+          <Text style={styles.cardNowText}>
+            {card?.now?.temperature} • {card?.now?.conditions} • Wind {card?.now?.wind}
+          </Text>
+        </View>
+        <View style={styles.cardDivider} />
+        <View style={styles.cardSectionHead}>
+          <Text style={styles.cardSectionTitle}>Next days</Text>
+        </View>
+        {Array.isArray(card.days) &&
+          card.days.map((d) => (
+            <View key={`${d.date}-${d.label}-${d.tempRange}`} style={styles.cardRow}>
+              <Text style={styles.cardRowDate}>{d.date}</Text>
+              <Text style={styles.cardRowMeta}>
+                {d.label} • {d.tempRange} • Rain {d.rain}
+              </Text>
+            </View>
+          ))}
+      </View>
+    );
+  };
+
+  const WeatherCard = ({ card }) => {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>{card.title}</Text>
+        <Text style={styles.cardSubtitle}>{card.place}</Text>
+        <View style={styles.cardMetrics}>
+          {Array.isArray(card.metrics) &&
+            card.metrics.map((m) => (
+              <View key={`${m.label}-${m.value}`} style={styles.metricRow}>
+                <Text style={styles.metricLabel}>{m.label}</Text>
+                <Text style={styles.metricValue}>{m.value}</Text>
+              </View>
+            ))}
+        </View>
+      </View>
+    );
+  };
+  
+  const MessageText = ({ text, isUser }) => {
+    const t = String(text || '');
+    if (isUser) {
+      return <Text style={[styles.bubbleText, styles.bubbleTextUser]}>{t}</Text>;
+    }
+    const lines = t.split('\n');
+    return (
+      <View style={styles.msgTextWrap}>
+        {lines.map((line, idx) => {
+          const trimmed = String(line || '').trim();
+          if (!trimmed) return <View key={`br-${idx}`} style={{ height: 4 }} />;
+          const isBullet = trimmed.startsWith('• ');
+          if (idx === 0 && !isBullet) {
+            return <Text key={`ttl-${idx}`} style={styles.msgTitle}>{trimmed}</Text>;
+          }
+          if (isBullet) {
+            const content = trimmed.replace(/^•\s*/, '');
+            return (
+              <View key={`row-${idx}`} style={styles.msgRow}>
+                <View style={styles.msgDot} />
+                <Text style={styles.msgLine}>{content}</Text>
+              </View>
+            );
+          }
+          return <Text key={`ln-${idx}`} style={styles.msgLine}>{trimmed}</Text>;
+        })}
+      </View>
+    );
+  };
+
   const renderMessage = ({ item }) => {
     const isUser = item.role === 'user';
     return (
@@ -216,9 +294,17 @@ export default function ChatbotScreen({ navigation, user }) {
           ]}
           elevation={isUser ? 1 : 2}
         >
-          <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextBot]}>
-            {item.text}
-          </Text>
+          {item?.card && !isUser ? (
+            item.card.type === 'forecast' ? (
+              <ForecastCard card={item.card} />
+            ) : item.card.type === 'weather' ? (
+              <WeatherCard card={item.card} />
+            ) : (
+              <MessageText text={item.text} isUser={isUser} />
+            )
+          ) : (
+            <MessageText text={item.text} isUser={isUser} />
+          )}
         </Surface>
       </View>
     );
@@ -465,6 +551,106 @@ const styles = StyleSheet.create({
   bubbleTextUser: {
     color: '#fff',
     fontWeight: '700',
+  },
+  msgTextWrap: {
+    gap: 6,
+  },
+  msgTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: THEME.textDark,
+  },
+  msgRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  msgDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 6,
+    backgroundColor: THEME.textLight,
+    marginTop: 6,
+  },
+  msgLine: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: THEME.textDark,
+    fontWeight: '600',
+    flex: 1,
+  },
+  card: {
+    gap: 4,
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: THEME.textDark,
+  },
+  cardSubtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: THEME.textLight,
+    marginBottom: 4,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    marginVertical: 6,
+  },
+  cardSectionHead: {
+    marginBottom: 4,
+  },
+  cardSectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: THEME.textDark,
+  },
+  cardNowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardNowText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: THEME.textDark,
+  },
+  cardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 2,
+  },
+  cardRowDate: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: THEME.textDark,
+  },
+  cardRowMeta: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 12,
+    fontWeight: '600',
+    color: THEME.textLight,
+  },
+  cardMetrics: {
+    gap: 6,
+  },
+  metricRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  metricLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: THEME.textDark,
+  },
+  metricValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: THEME.textLight,
   },
   inputWrap: {
     paddingHorizontal: 14,

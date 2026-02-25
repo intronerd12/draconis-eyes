@@ -261,8 +261,8 @@ function CommunityForum() {
           return pid === uid ? updated : p
         })
       )
-    } catch (error) {
-      toast.error('Failed to update reaction')
+    } catch (err) {
+      toast.error(err?.message || 'Failed to update reaction')
     }
   }
 
@@ -295,8 +295,8 @@ function CommunityForum() {
       )
       setCommentDrafts((prev) => ({ ...prev, [postId]: '' }))
       void loadNotifications()
-    } catch (error) {
-      toast.error(error?.message || 'Could not add comment')
+    } catch (err) {
+      toast.error(err?.message || 'Could not add comment')
     }
   }
 
@@ -313,7 +313,9 @@ function CommunityForum() {
       })
       setUnreadCount(0)
       setNotifications((prev) => prev.map((item) => ({ ...item, readAt: item.readAt || new Date().toISOString() })))
-    } catch {}
+    } catch (err) {
+      void err
+    }
   }
 
   return (
@@ -686,4 +688,3 @@ function CommunityForum() {
 }
 
 export default CommunityForum
-

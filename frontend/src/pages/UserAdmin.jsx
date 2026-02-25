@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { BRAND_NAME } from '../config/brand'
 import './Landing.css'
 
 function UserAdmin() {
-  const navigate = useNavigate()
   const [historySummary, setHistorySummary] = useState({
     total: 0,
     average_quality: null,
@@ -18,13 +16,7 @@ function UserAdmin() {
   const [reportFrom, setReportFrom] = useState('')
   const [reportTo, setReportTo] = useState('')
   const [adminReport, setAdminReport] = useState(null)
-  const [analysisResult, setAnalysisResult] = useState(null)
-
-  const handleLogout = () => {
-    localStorage.removeItem('user')
-    toast.success('Logged out successfully')
-    navigate('/')
-  }
+  const [analysisResult] = useState(null)
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -41,7 +33,7 @@ function UserAdmin() {
           defect_level_distribution: data.defect_level_distribution ?? { low: 0, medium: 0, high: 0 },
         })
       } catch (err) {
-        console.error('Failed to fetch history:', err)
+        console.error('Failed to fetch history:', err?.message || err)
       }
     }
     fetchHistory()
@@ -62,7 +54,7 @@ function UserAdmin() {
       toast.success('Grade correction submitted!')
       setCorrectionGrade('')
     } catch (err) {
-      toast.error('Failed to submit correction')
+      toast.error(err?.message || 'Failed to submit correction')
     }
   }
 
@@ -79,7 +71,7 @@ function UserAdmin() {
       setAdminReport(data)
       toast.success('Report generated!')
     } catch (err) {
-      toast.error('Failed to generate report')
+      toast.error(err?.message || 'Failed to generate report')
     }
   }
 

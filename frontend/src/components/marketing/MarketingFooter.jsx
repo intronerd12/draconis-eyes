@@ -62,11 +62,14 @@ function MarketingFooter() {
           <h3>Follow Us</h3>
           <p>Get the latest updates from our team.</p>
           <div className="lp-footer-social">
-            {SOCIAL_LINKS.map(({ href, label, icon: Icon }) => (
-              <a key={label} href={href} target="_blank" rel="noreferrer" aria-label={label}>
-                <Icon size={16} />
-              </a>
-            ))}
+            {SOCIAL_LINKS.map(({ href, label, icon }) => {
+              const IconComponent = icon
+              return (
+                <a key={label} href={href} target="_blank" rel="noreferrer" aria-label={label}>
+                  <IconComponent size={16} />
+                </a>
+              )
+            })}
           </div>
         </div>
       </div>

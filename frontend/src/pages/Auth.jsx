@@ -140,7 +140,7 @@ function Auth() {
   useEffect(() => {
     const id = setInterval(() => setActiveSlide(s => (s + 1) % SLIDES.length), 6000)
     return () => clearInterval(id)
-  }, [])
+  }, [SLIDES.length])
 
   const goToSlide = (index) => {
     const next = (index + SLIDES.length) % SLIDES.length
