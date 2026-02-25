@@ -191,6 +191,30 @@ def _grade_from_index_abc(score: float) -> str:
     return "C"
 
 
+def _grade_from_area_ratio(fruit_area_ratio: float) -> str:
+    # Area-driven grade anchor from segmentation preview coverage.
+    ratio = float(np.clip(float(fruit_area_ratio), 0.0, 1.0))
+    if ratio <= 0.0:
+        return "N/A"
+    if ratio < 0.12:
+        return "C"
+    if ratio < 0.26:
+        return "B"
+    return "A"
+
+
+def _grade_cap_by_area(grade: str, area_grade: str) -> str:
+    # Final grade cannot be better than the area-derived anchor grade.
+    order = ["A", "B", "C", "D", "E"]
+    g = (grade or "E").upper()
+    a = (area_grade or "E").upper()
+    if g not in order:
+        g = "E"
+    if a not in order:
+        a = "E"
+    return order[max(order.index(g), order.index(a))]
+
+
 def _size_num(size_category: str | None) -> float:
     s = (size_category or "").lower()
     if s == "large":
@@ -790,6 +814,7 @@ def _compute_quality_index(
     quality_score: float,
     ripeness_score: float,
     defect_probability: float,
+    fruit_area_ratio: float,
     insect_risk_score: int,
     yolo_bad_best_conf: float,
     best_yolo_conf: float,
@@ -804,14 +829,16 @@ def _compute_quality_index(
     insect_component = float(np.clip(100.0 - (float(insect_risk_score) * 0.75), 0.0, 100.0))
     shape_component = float(np.clip((float(shape_score) / 10.0) * 100.0, 0.0, 100.0))
     detect_component = float(np.clip(float(best_yolo_conf) * 100.0, 45.0, 100.0))
+    area_component = float(np.clip(((float(fruit_area_ratio) - 0.06) / 0.38) * 100.0, 0.0, 100.0))
 
     quality_index = (
-        (0.34 * q)
-        + (0.20 * ripeness_fit)
-        + (0.22 * defect_component)
-        + (0.10 * insect_component)
-        + (0.08 * shape_component)
+        (0.30 * q)
+        + (0.19 * ripeness_fit)
+        + (0.21 * defect_component)
+        + (0.09 * insect_component)
+        + (0.07 * shape_component)
         + (0.06 * detect_component)
+        + (0.08 * area_component)
     )
 
     if size_category == "Large":
@@ -1067,6 +1094,7 @@ async def detect_quality(
 
         # Pick the most reliable detection as the primary fruit region (handles multi-fruit frames).
         primary_bbox = None
+        primary_bbox_area_ratio = 0.0
         if yolo_detections:
             best = max(yolo_detections, key=lambda d: float(d.get("conf", 0.0)))
             try:
@@ -1077,8 +1105,12 @@ async def detect_quality(
                     int(best.get("y1", height - 1)),
                 )
                 primary_bbox = _bbox_pad(primary_bbox, width, height, pad_frac=0.10)
+                bw = max(0, int(primary_bbox[2]) - int(primary_bbox[0]))
+                bh = max(0, int(primary_bbox[3]) - int(primary_bbox[1]))
+                primary_bbox_area_ratio = float((bw * bh) / max(1, width * height))
             except Exception:
                 primary_bbox = None
+                primary_bbox_area_ratio = 0.0
 
         # Keep only disease detections that are likely inside the detected fruit.
         yolo_bad_detections = _filter_disease_detections_for_fruit(yolo_bad_detections, primary_bbox)
@@ -1118,20 +1150,32 @@ async def detect_quality(
         # Mobile scans: use a hybrid gate (YOLO + color profile) to reduce
         # false negatives while still rejecting unrelated images.
         if is_mobile_source:
-            has_strong_yolo = best_yolo_conf >= 0.30
-            has_weak_yolo_plus_color = (
-                best_yolo_conf >= 0.18 and relevance_ratio >= 0.07 and (pink_ratio >= 0.02 or green_ratio >= 0.02)
+            yolo_box_reasonable_size = 0.015 <= float(primary_bbox_area_ratio) <= 0.92
+            has_strong_yolo = best_yolo_conf >= 0.52 and yolo_box_reasonable_size
+            has_yolo_plus_color = (
+                best_yolo_conf >= 0.40
+                and yolo_box_reasonable_size
+                and relevance_ratio >= 0.10
+                and (pink_ratio >= 0.015 or green_ratio >= 0.012)
+            )
+            has_multi_yolo_support = (
+                len(yolo_detections) >= 2
+                and best_yolo_conf >= 0.36
+                and relevance_ratio >= 0.12
             )
             has_strong_color_signature = (
-                len(yolo_detections) == 0 and relevance_ratio >= 0.30 and pink_ratio >= 0.10 and green_ratio >= 0.015
+                len(yolo_detections) == 0
+                and relevance_ratio >= 0.36
+                and pink_ratio >= 0.11
+                and green_ratio >= 0.018
             )
-            if not (has_strong_yolo or has_weak_yolo_plus_color or has_strong_color_signature):
+            if not (has_strong_yolo or has_yolo_plus_color or has_multi_yolo_support or has_strong_color_signature):
                 is_valid_fruit = False
-                warning_message = "No dragon fruit detected."
+                warning_message = "No dragon fruit detected. Align the fruit in good lighting and try again."
                 grade = "N/A"
                 fruit_type = "No dragon fruit detected"
         # Web/other sources can still use color fallback when YOLO is not available.
-        elif (not yolo_detections) and relevance_ratio < 0.20:
+        elif (not yolo_detections) and relevance_ratio < 0.24:
             is_valid_fruit = False
             warning_message = "No dragon fruit detected."
             grade = "N/A"
@@ -1151,6 +1195,13 @@ async def detect_quality(
             seg_mask = _segmentation_mask_from_colors([mask_pink_red, mask_yellow, mask_green, mask_white])
         fruit_area_pixels = int(np.sum(seg_mask))
         fruit_area_ratio = float(fruit_area_pixels / max(1, total_pixels))
+        area_grade_anchor = _grade_from_area_ratio(fruit_area_ratio)
+        if fruit_area_pixels <= 0 or float(fruit_area_ratio) <= 0.0:
+            is_valid_fruit = False
+            warning_message = "No dragon fruit detected."
+            grade = "N/A"
+            fruit_type = "No dragon fruit detected"
+
         bbox = _mask_bbox(seg_mask, width, height)
         # Final disease-filter pass using the segmented fruit bbox when YOLO primary box is weak/missing.
         final_fruit_bbox = primary_bbox if primary_bbox is not None else _bbox_pad(bbox, width, height, pad_frac=0.08)
@@ -1312,6 +1363,7 @@ async def detect_quality(
             quality_score=quality_score,
             ripeness_score=ripeness_score,
             defect_probability=defect_probability,
+            fruit_area_ratio=fruit_area_ratio,
             insect_risk_score=insect_risk_score,
             yolo_bad_best_conf=yolo_bad_best_conf,
             best_yolo_conf=best_yolo_conf,
@@ -1348,8 +1400,19 @@ async def detect_quality(
                 and ripeness_score >= 75
             ):
                 grade = _upgrade_grade_floor(grade, "B")
+
+            # Area-based floor: bigger segmented fruit area should trend to better grade,
+            # while still respecting disease/defect constraints.
+            if area_grade_anchor == "A" and defect_level == "low" and insect_risk_level != "high":
+                grade = _upgrade_grade_floor(grade, "B")
+                if quality_score >= 80 and yolo_bad_best_conf < 0.62:
+                    grade = _upgrade_grade_floor(grade, "A")
+            elif area_grade_anchor == "B" and defect_level == "low" and insect_risk_level != "high":
+                grade = _upgrade_grade_floor(grade, "B")
+
             # Keep valid fruit in A/B/C bands for operational grading.
             grade = _upgrade_grade_floor(grade, "C")
+            grade = _grade_cap_by_area(grade, area_grade_anchor)
 
         features = {
             "quality_score": float(round(quality_score, 3)),
@@ -1387,6 +1450,15 @@ async def detect_quality(
                 estimated_price_per_kg = float((model_weight * model_price) + ((1.0 - model_weight) * baseline_price))
             else:
                 estimated_price_per_kg = float(baseline_price)
+
+            # Area premium/discount: larger segmented fruit area should produce better price.
+            area_price_factor = float(np.clip(0.82 + (float(fruit_area_ratio) * 1.10), 0.82, 1.16))
+            estimated_price_per_kg = float(estimated_price_per_kg * area_price_factor)
+            model_price = float(model_price * area_price_factor) if model_price else 0.0
+            baseline_price = float(baseline_price * area_price_factor) if baseline_price else 0.0
+
+            model_price = float(_clamp(float(model_price), lo_price, hi_price)) if model_price else 0.0
+            baseline_price = float(_clamp(float(baseline_price), lo_price, hi_price)) if baseline_price else 0.0
             estimated_price_per_kg = float(_clamp(float(estimated_price_per_kg), lo_price, hi_price))
         else:
             estimated_price_per_kg = 0.0
@@ -1430,6 +1502,7 @@ async def detect_quality(
             "fruit_status": fruit_status,
             "grade": grade,
             "is_valid_fruit": is_valid_fruit,
+            "area_grade_anchor": area_grade_anchor,
             "warning_message": warning_message,
             "size_category": size_category,
             "weight_grams_est": weight_grams,
@@ -1499,7 +1572,7 @@ async def detect_quality(
                 "mae": (PRICE_MODEL.get("metrics") or {}).get("mae"),
             },
             "recommendations": recommendations,
-            "notes": f"Grade {grade} {fruit_type}. {wings_condition}.",
+            "notes": f"Grade {grade} {fruit_type}. Area {int(round(fruit_area_ratio * 100.0))}%. {wings_condition}.",
             "color_analysis": {"r": int(round(r)), "g": int(round(g)), "b": int(round(b)), "score": round(color_score, 2)},
             "defect_description": disease_status,
         }
@@ -1510,6 +1583,7 @@ async def detect_quality(
                     "fruit_type": "No dragon fruit detected",
                     "fruit_status": "No result",
                     "grade": "N/A",
+                    "area_grade_anchor": "N/A",
                     "size_category": "N/A",
                     "weight_grams_est": 0,
                     "ripeness_score": 0.0,

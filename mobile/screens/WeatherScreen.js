@@ -6,7 +6,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as Location from 'expo-location';
-import { API_URL } from '../services/api';
+import { apiFetch } from '../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -83,7 +83,7 @@ export default function WeatherScreen() {
     try {
       // Clean province name (remove "Province" suffix if present)
       const cleanProvince = province.replace(' Province', '');
-      const response = await fetch(`${API_URL}/api/weather?province=${encodeURIComponent(cleanProvince)}`);
+      const response = await apiFetch(`/api/weather?province=${encodeURIComponent(cleanProvince)}`);
       
       if (!response.ok) throw new Error('Network response was not ok');
       

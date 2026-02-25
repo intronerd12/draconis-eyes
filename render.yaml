@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: dragon-backend
+    env: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: RENDER
+        value: "true"
+      - key: PYTHON_SERVICE_URL
+        value: https://dragon-ai.onrender.com
+      - key: MONGO_URI
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: DRAGON_SELFTRAIN_ENABLED
+        value: "0"
+      - key: DRAGON_ADMIN_TOKEN
+        sync: false
+
+  - type: web
+    name: dragon-ai
+    env: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && pip install -r requirements-ml.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port ${PORT}
+    autoDeploy: true
+
+  - type: static
+    name: dragon-frontend
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    autoDeploy: true

@@ -129,6 +129,10 @@ export default function HomeScreen({ user, onLogout }) {
     }
   };
 
+  const handleCommunityPress = () => {
+    navigation.navigate('CommunityForum');
+  };
+
   const ScanButton = () => (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <TouchableOpacity 
@@ -216,11 +220,18 @@ export default function HomeScreen({ user, onLogout }) {
             </View>
           </TouchableOpacity>
           
-          <TouchableOpacity onPress={handleLogoutPress} style={styles.logoutBtn}>
-            <BlurView intensity={20} style={styles.blurBtn}>
-              <Ionicons name="log-out-outline" size={22} color={THEME.white} />
-            </BlurView>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity onPress={handleCommunityPress} style={styles.communityBtn}>
+              <BlurView intensity={20} style={styles.blurBtn}>
+                <Ionicons name="people-outline" size={20} color={THEME.white} />
+              </BlurView>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleLogoutPress} style={styles.logoutBtn}>
+              <BlurView intensity={20} style={styles.blurBtn}>
+                <Ionicons name="log-out-outline" size={22} color={THEME.white} />
+              </BlurView>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -568,6 +579,15 @@ const styles = StyleSheet.create({
   logoutBtn: {
     borderRadius: 10,
     overflow: 'hidden',
+  },
+  communityBtn: {
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   blurBtn: {
     padding: 6,

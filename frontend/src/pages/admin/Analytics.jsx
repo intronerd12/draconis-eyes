@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   Area,
   AreaChart,
@@ -18,6 +20,7 @@ import {
 } from 'recharts';
 import { Activity, CloudSun, RefreshCw, Smartphone, Users } from 'lucide-react';
 import { API_BASE_URL } from '../../config/api';
+import { BRAND_NAME } from '../../config/brand';
 
 const SOURCE_COLORS = {
   Mobile: '#dc2626',
@@ -76,6 +79,121 @@ const Analytics = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [lastUpdated, setLastUpdated] = useState(null);
+
+  const generatePdfReport = useCallback(() => {
+    const doc = new jsPDF('p', 'pt', 'a4');
+    const margin = 36;
+    const now = lastUpdated || new Date();
+    const totals = analytics?.totals || {};
+    const scanTrend = Array.isArray(analytics?.scanTrend) ? analytics.scanTrend : [];
+    const loginTrend = Array.isArray(analytics?.loginTrend) ? analytics.loginTrend : [];
+    const grades = Array.isArray(analytics?.gradeDistribution) ? analytics.gradeDistribution : [];
+    const sources = Array.isArray(analytics?.sourceDistribution) ? analytics.sourceDistribution : [];
+    const diseases = Array.isArray(analytics?.diseaseSignals) ? analytics.diseaseSignals : [];
+    const totalSource = (totals.mobileScans || 0) + (totals.webScans || 0);
+    const lastScans = scanTrend.length ? Number(scanTrend[scanTrend.length - 1]?.scans || 0) : 0;
+    const prevScans = scanTrend.length > 1 ? Number(scanTrend[scanTrend.length - 2]?.scans || 0) : 0;
+    const scanDelta = lastScans - prevScans;
+    const scanDeltaPct = prevScans ? Math.round((scanDelta / Math.max(prevScans, 1)) * 100) : 0;
+    const lastLogins = loginTrend.length ? Number(loginTrend[loginTrend.length - 1]?.logins || 0) : 0;
+    const prevLogins = loginTrend.length > 1 ? Number(loginTrend[loginTrend.length - 2]?.logins || 0) : 0;
+    const loginDelta = lastLogins - prevLogins;
+    const loginDeltaPct = prevLogins ? Math.round((loginDelta / Math.max(prevLogins, 1)) * 100) : 0;
+    const mobileShare = totalSource ? Math.round(((totals.mobileScans || 0) / totalSource) * 100) : 0;
+    const webShare = totalSource ? Math.round(((totals.webScans || 0) / totalSource) * 100) : 0;
+    const totalGrades = grades.reduce((sum, g) => sum + Number(g.count || 0), 0);
+    const topGrade = grades
+      .map((g) => ({ grade: g.grade, count: Number(g.count || 0) }))
+      .sort((a, b) => b.count - a.count)[0];
+    const topGradePct = totalGrades ? Math.round(((topGrade?.count || 0) / totalGrades) * 100) : 0;
+    let y = margin;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text(`${BRAND_NAME} Analytics Report`, margin, y);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    y += 18;
+    doc.text(`Generated: ${now.toLocaleString()}`, margin, y);
+    y += 18;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('Summary', margin, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12);
+    y += 16;
+    doc.text(`Total Scans: ${numberFmt.format(totals.scans || 0)}`, margin, y);
+    y += 16;
+    doc.text(`Users: ${numberFmt.format(totals.users || 0)} (${numberFmt.format(totals.activeUsers || 0)} active)`, margin, y);
+    y += 16;
+    doc.text(`Mobile vs Web: ${numberFmt.format(totals.mobileScans || 0)} vs ${numberFmt.format(totals.webScans || 0)} (${mobileShare}% / ${webShare}%)`, margin, y);
+    y += 16;
+    doc.text(`Logins (24h): ${numberFmt.format(totals.logins24h || 0)}`, margin, y);
+    y += 22;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('Interpretation', margin, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12);
+    y += 16;
+    doc.text(`• Scan throughput ${scanDelta >= 0 ? 'increased' : 'decreased'} by ${Math.abs(scanDeltaPct)}% versus the previous day.`, margin, y);
+    y += 16;
+    doc.text(`• User logins ${loginDelta >= 0 ? 'increased' : 'decreased'} by ${Math.abs(loginDeltaPct)}% over the last day.`, margin, y);
+    y += 16;
+    if (topGrade?.grade) {
+      doc.text(`• Grade ${topGrade.grade} is dominant at ${topGradePct}% of analyzed fruit.`, margin, y);
+      y += 16;
+    }
+    doc.text(`• Source mix indicates ${mobileShare}% mobile and ${webShare}% web engagement.`, margin, y);
+    y += 16;
+    if (weather) {
+      const temp = weather?.temperature != null ? `${weather.temperature}°C` : 'N/A';
+      const hum = weather?.humidity != null ? `${weather.humidity}%` : 'N/A';
+      const cond = weather?.condition || 'Unavailable';
+      doc.text(`• Environment: ${cond}, temperature ${temp}, humidity ${hum}.`, margin, y);
+      y += 16;
+    }
+    y += 10;
+    autoTable(doc, {
+      startY: y,
+      head: [['Grade', 'Count', 'Percent']],
+      body: grades.map((g) => {
+        const c = Number(g.count || 0);
+        const p = totalGrades ? Math.round((c / totalGrades) * 100) : 0;
+        return [String(g.grade || 'UNKNOWN'), numberFmt.format(c), `${p}%`];
+      }),
+      styles: { fontSize: 11 },
+      headStyles: { fillColor: [216, 27, 96] },
+      theme: 'striped',
+    });
+    const afterGradesY = doc.lastAutoTable.finalY + 20;
+    autoTable(doc, {
+      startY: afterGradesY,
+      head: [['Source', 'Count', 'Percent']],
+      body: sources.map((s) => {
+        const c = Number(s.count || 0);
+        const p = totalSource ? Math.round((c / totalSource) * 100) : 0;
+        return [String(s.source || 'Unknown'), numberFmt.format(c), `${p}%`];
+      }),
+      styles: { fontSize: 11 },
+      headStyles: { fillColor: [29, 78, 216] },
+      theme: 'striped',
+    });
+    const afterSourcesY = doc.lastAutoTable.finalY + 20;
+    autoTable(doc, {
+      startY: afterSourcesY,
+      head: [['Signal', 'Count']],
+      body: diseases.map((d) => [String(d.name || 'Unknown'), numberFmt.format(Number(d.count || 0))]),
+      styles: { fontSize: 11 },
+      headStyles: { fillColor: [190, 18, 60] },
+      theme: 'striped',
+    });
+    const footerY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 26 : afterSourcesY + 26;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(10);
+    doc.text(`${BRAND_NAME} • Automated insights for produce quality operations`, margin, footerY);
+    const fileName = `Analytics_Report_${new Date(now).toISOString().slice(0, 10)}.pdf`;
+    doc.save(fileName);
+  }, [analytics, weather, lastUpdated]);
 
   const loadAnalytics = useCallback(async (showInitialLoader = false) => {
     if (showInitialLoader) setLoading(true);
@@ -209,7 +327,7 @@ const Analytics = () => {
             Live operations telemetry from mobile scans, user activity, and weather context.
           </p>
         </div>
-        <div style={{ textAlign: 'right', minWidth: 170 }}>
+        <div style={{ textAlign: 'right', minWidth: 260 }}>
           <div style={{ fontSize: 12, color: 'var(--gray-500)' }}>Auto refresh every 5s</div>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--gray-700)' }}>
             {lastUpdated ? lastUpdated.toLocaleTimeString() : '--:--:--'}
@@ -217,6 +335,26 @@ const Analytics = () => {
           {refreshing ? (
             <div style={{ fontSize: 12, color: '#2563eb', marginTop: 4 }}>Refreshing...</div>
           ) : null}
+          <div style={{ marginTop: 10 }}>
+            <button
+              type="button"
+              onClick={generatePdfReport}
+              style={{
+                border: 'none',
+                background: 'linear-gradient(135deg, #D81B60, #B8105B)',
+                color: 'white',
+                borderRadius: 10,
+                padding: '10px 14px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 8px 18px rgba(216,27,96,0.2)',
+              }}
+              onMouseOver={(e) => (e.currentTarget.style.opacity = '0.92')}
+              onMouseOut={(e) => (e.currentTarget.style.opacity = '1')}
+            >
+              Download PDF Report
+            </button>
+          </div>
         </div>
       </div>
 

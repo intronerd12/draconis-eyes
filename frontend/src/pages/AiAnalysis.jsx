@@ -1,40 +1,117 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
+import { API_BASE_URL } from '../config/api'
 import { BRAND_NAME } from '../config/brand'
 import './Landing.css'
 
+const NAV_ITEMS = [
+  { path: '/overview', label: 'Overview', icon: '🏠' },
+  { path: '/ai-analysis', label: 'AI Analysis', icon: '🧪' },
+  { path: '/community', label: 'Community', icon: '👥' },
+]
+
+const toPercent = (value) => {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return '0%'
+  return `${Math.max(0, Math.min(100, Math.round(n)))}%`
+}
+
+const toAreaPercent = (value) => {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n <= 0) return '0%'
+  return `${Math.round(n * 100)}%`
+}
+
+const toCurrency = (value) => {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return 'PHP 0.00/kg'
+  return `PHP ${n.toFixed(2)}/kg`
+}
+
+const parseUserMeta = () => {
+  try {
+    const raw = localStorage.getItem('user')
+    if (!raw) return {}
+    const user = JSON.parse(raw)
+    return {
+      userId: String(user?._id || user?.id || user?.userId || '').trim() || undefined,
+      userName: String(user?.name || user?.fullName || user?.username || '').trim() || undefined,
+      userEmail: String(user?.email || '').trim().toLowerCase() || undefined,
+    }
+  } catch {
+    return {}
+  }
+}
+
 function AiAnalysis() {
-  const navigate = useNavigate()
   const [uploading, setUploading] = useState(false)
   const [fileName, setFileName] = useState('')
   const [file, setFile] = useState(null)
   const [batchId, setBatchId] = useState('')
   const [analysisResult, setAnalysisResult] = useState(null)
 
-  const handleLogout = () => {
-    localStorage.removeItem('user')
-    toast.success('Logged out successfully')
-    navigate('/')
-  }
+  const previewUrl = useMemo(() => {
+    if (!file) return ''
+    return URL.createObjectURL(file)
+  }, [file])
 
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+    }
+  }, [previewUrl])
   const handleAnalyze = async (e) => {
     e.preventDefault()
     if (!file) return
     setUploading(true)
+
     try {
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append('image', file)
       if (batchId.trim()) formData.append('batch_id', batchId.trim())
+      formData.append('client', 'web')
+      formData.append('source', 'web_app')
 
-      const res = await fetch('http://localhost:8000/detect', {
+      const res = await fetch(`${API_BASE_URL}/api/scan/analyze`, {
         method: 'POST',
         body: formData,
       })
-      if (!res.ok) throw new Error('Analysis failed')
-      const data = await res.json()
+
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data?.message || data?.detail || 'Analysis failed')
+      }
+
       setAnalysisResult(data)
-      toast.success('Analysis complete!')
+      localStorage.setItem(
+        'latest_web_scan_result',
+        JSON.stringify({
+          ...data,
+          createdAt: new Date().toISOString(),
+        })
+      )
+      try {
+        const { userId, userName, userEmail } = parseUserMeta()
+        await fetch(`${API_BASE_URL}/api/scan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            grade: String(data?.grade || 'UNKNOWN').toUpperCase(),
+            details: data?.notes || data?.shelf_life_label || 'AI web analysis',
+            imageUrl: '',
+            timestamp: new Date().toISOString(),
+            userId,
+            operatorName: userName,
+            operatorEmail: userEmail,
+            fruitType: data?.fruit_type || data?.fruitType || 'Dragon Fruit',
+            localScanId: `web-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            source: 'web_app',
+          }),
+        })
+      } catch {
+        // Keep analysis success even if scan record sync fails.
+      }
+      toast.success('Analysis complete')
     } catch (err) {
       toast.error(err.message || 'Analysis failed')
     } finally {
@@ -43,166 +120,312 @@ function AiAnalysis() {
   }
 
   return (
-    <div className="app-shell" style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(180deg, #fff6fb 0%, #fff0f6 12%, #f3fbf8 46%, #eef8ff 100%)'
-    }}>
-      <header style={{
-        backdropFilter: 'blur(14px)',
-        background: 'rgba(255, 255, 255, 0.88)',
-        borderBottom: '1px solid rgba(16, 25, 39, 0.08)',
-        padding: '16px 0',
-        position: 'sticky',
-        top: 0,
-        zIndex: 40
-      }}>
-        <div className="container-pro" style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '32px'
-        }}>
+    <div className="app-shell" style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #fdf4f9 0%, #f3f7ff 60%, #eefbf7 100%)' }}>
+      <header
+        style={{
+          background: '#fff',
+          borderBottom: '1px solid #f0f0f0',
+          padding: '16px 0',
+          position: 'sticky',
+          top: 0,
+          zIndex: 40,
+        }}
+      >
+        <div className="container-pro" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '28px' }}>
           <a href="/home" style={{ textDecoration: 'none', color: 'inherit' }}>
             <div style={{ fontSize: '1.3rem', fontWeight: '700' }}>🌴 {BRAND_NAME}</div>
           </a>
+
           <nav style={{ display: 'flex', gap: '32px', flex: 1, alignItems: 'center' }}>
-            {[
-              { path: '/overview', label: 'Overview', icon: '🏠' },
-              { path: '/user-features', label: 'Features', icon: '✨' },
-              { path: '/ai-analysis', label: 'AI Analysis', icon: '🧪' },
-              { path: '/marketplace', label: 'Marketplace', icon: '🛒' },
-              { path: '/user-admin', label: 'Admin', icon: '⚙️' }
-            ].map(item => {
+            {NAV_ITEMS.map((item) => {
               const isActive = window.location.pathname === item.path
               return (
-                <a key={item.path} href={item.path} style={{
-                  textDecoration: 'none',
-                  color: isActive ? '#D81B60' : '#6b7280',
-                  fontWeight: isActive ? '700' : '500',
-                  fontSize: '0.95rem',
-                  paddingBottom: '4px',
-                  borderBottom: isActive ? '2px solid #D81B60' : 'none',
-                  transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}>
+                <a
+                  key={item.path}
+                  href={item.path}
+                  style={{
+                    textDecoration: 'none',
+                    color: isActive ? '#D81B60' : '#6b7280',
+                    fontWeight: isActive ? '700' : '500',
+                    fontSize: '0.95rem',
+                    paddingBottom: '4px',
+                    borderBottom: isActive ? '2px solid #D81B60' : 'none',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
                   <span>{item.icon}</span>
                   {item.label}
                 </a>
               )
             })}
           </nav>
-          <a href="/home" style={{
-            padding: '8px 16px',
-            background: '#f5f5f5',
-            border: '1px solid #ddd',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '0.9rem',
-            fontWeight: '500',
-            textDecoration: 'none',
-            color: '#000',
-            transition: 'all 0.2s ease',
-            whiteSpace: 'nowrap'
-          }}>← Dashboard</a>
+
+          <a
+            href="/home"
+            style={{
+              padding: '8px 16px',
+              background: '#f5f5f5',
+              border: '1px solid #ddd',
+              borderRadius: '6px',
+              fontSize: '0.9rem',
+              fontWeight: '500',
+              textDecoration: 'none',
+              color: '#000',
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            ← Dashboard
+          </a>
         </div>
       </header>
 
       <main>
-        <section className="analyze lp-section lp-section-alt" id="analyze">
+        <section className="lp-section" style={{ paddingTop: '24px' }}>
           <div className="container-pro">
-            <div className="analyze-card">
-              <div className="analyze-bg-blur" />
-              <div className="analyze-content">
-                <div className="analyze-left">
-                  <h2>Upload a fruit image for analysis 🧪</h2>
-                  <p>Use a high-quality image and let the system estimate ripeness and grade within seconds.</p>
-                  <div className="upload-form">
-                    <form onSubmit={handleAnalyze}>
-                      <label className="upload-zone">
-                        <div className="upload-icon">📸</div>
-                        <span className="upload-text">Click to upload image</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0]
-                            setFileName(f?.name ?? '')
-                            setFile(f)
-                          }}
-                        />
-                      </label>
-                      {fileName && (
-                        <div className="upload-filename">
-                          <span>{fileName}</span>
-                          <button type="button" onClick={() => setFileName('')}>✕</button>
-                        </div>
-                      )}
-                      <input
-                        type="text"
-                        value={batchId}
-                        onChange={(e) => setBatchId(e.target.value)}
-                        placeholder="Batch ID (optional)"
-                        className="batch-input"
-                      />
-                      <button type="submit" disabled={!fileName || uploading} className="btn-primary analyze-button">
-                        {uploading ? 'Analyzing...' : 'Analyze Now'}
-                      </button>
-                    </form>
-                  </div>
+            <div
+              id="ai-analyze-workspace"
+              style={{
+                borderRadius: '24px',
+                border: '1px solid rgba(16, 25, 39, 0.08)',
+                background: 'linear-gradient(135deg, #ffffff 0%, #fff6fb 45%, #f5fbff 100%)',
+                boxShadow: '0 20px 50px rgba(15, 23, 42, 0.12)',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  padding: '34px 34px 16px',
+                  borderBottom: '1px solid rgba(16, 25, 39, 0.06)',
+                  background: 'linear-gradient(120deg, rgba(216, 27, 96, 0.08), rgba(59, 130, 246, 0.08))',
+                }}
+              >
+                <div style={{ fontSize: '0.82rem', letterSpacing: '0.08em', fontWeight: 700, color: '#9f1239', textTransform: 'uppercase' }}>
+                  AI Quality Lab
                 </div>
+                <h1 style={{ margin: '10px 0 8px', fontSize: '2rem', lineHeight: 1.2, color: '#0f172a' }}>
+                  Professional Dragonfruit Analysis
+                </h1>
+                <p style={{ margin: 0, color: '#475569', maxWidth: '860px' }}>
+                  Upload one clear image and the model will return grading, quality score, area coverage, estimated price, and recommendation.
+                </p>
+                <div style={{ display: 'flex', gap: '10px', marginTop: '14px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#065f46', background: '#d1fae5', borderRadius: '999px', padding: '4px 10px' }}>YOLO Enabled</span>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#075985', background: '#e0f2fe', borderRadius: '999px', padding: '4px 10px' }}>Web + Mobile Aligned</span>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#7c2d12', background: '#ffedd5', borderRadius: '999px', padding: '4px 10px' }}>Scan Sync Active</span>
+                </div>
+              </div>
 
-                {analysisResult && (
-                  <div className="analyze-right">
-                    <div className="result-card">
-                      <div className="result-header">
-                        <div className="result-avatar">🐲</div>
-                        <div className="result-info">
-                          <div className="result-title">Latest Analysis</div>
-                          <div className="result-id">ID: {analysisResult?.id?.slice(0, 8) || '#8392-A'}</div>
-                        </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(320px, 1fr) minmax(300px, 0.92fr)',
+                  gap: '20px',
+                  padding: '24px',
+                }}
+              >
+                <form onSubmit={handleAnalyze} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>Upload Image</div>
+                  <label
+                    style={{
+                      border: '2px dashed rgba(148, 163, 184, 0.45)',
+                      borderRadius: '16px',
+                      background: '#ffffff',
+                      minHeight: '210px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {previewUrl ? (
+                      <img src={previewUrl} alt="Preview" style={{ width: '100%', height: '100%', maxHeight: '300px', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ textAlign: 'center', color: '#64748b' }}>
+                        <div style={{ fontSize: '2rem', marginBottom: '6px' }}>Upload</div>
+                        <div style={{ fontWeight: 600 }}>Click to choose dragonfruit image</div>
                       </div>
-                      <div className="result-metrics">
-                        <div className="metric">
-                          <div className="metric-header">
-                            <span className="metric-label">Ripeness score</span>
-                            <span className="metric-value">{Math.round(analysisResult.ripeness_score)}%</span>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const selected = e.target.files?.[0]
+                        setFile(selected || null)
+                        setFileName(selected?.name || '')
+                      }}
+                    />
+                  </label>
+
+                  {fileName ? (
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '10px',
+                        border: '1px solid rgba(148, 163, 184, 0.35)',
+                        borderRadius: '10px',
+                        padding: '8px 10px',
+                        color: '#334155',
+                        fontSize: '0.9rem',
+                      }}
+                    >
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFile(null)
+                          setFileName('')
+                        }}
+                        style={{ border: 'none', background: 'transparent', color: '#b91c1c', cursor: 'pointer', fontWeight: 700 }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : null}
+
+                  <input
+                    type="text"
+                    value={batchId}
+                    onChange={(e) => setBatchId(e.target.value)}
+                    placeholder="Batch ID (optional)"
+                    style={{
+                      border: '1px solid rgba(148, 163, 184, 0.4)',
+                      borderRadius: '10px',
+                      padding: '12px',
+                      fontSize: '0.95rem',
+                      outline: 'none',
+                    }}
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={!file || uploading}
+                    style={{
+                      marginTop: '4px',
+                      border: 'none',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, #D81B60, #B8105B)',
+                      color: '#fff',
+                      padding: '12px 16px',
+                      fontWeight: 700,
+                      fontSize: '0.96rem',
+                      cursor: !file || uploading ? 'not-allowed' : 'pointer',
+                      opacity: !file || uploading ? 0.65 : 1,
+                    }}
+                  >
+                    {uploading ? 'Analyzing image...' : 'Run AI Analysis'}
+                  </button>
+                </form>
+
+                <div
+                  style={{
+                    border: '1px solid rgba(16, 25, 39, 0.08)',
+                    borderRadius: '16px',
+                    background: '#ffffff',
+                    padding: '16px',
+                    minHeight: '390px',
+                  }}
+                >
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a', marginBottom: '10px' }}>Analysis Result</div>
+
+                  {!analysisResult ? (
+                    <div
+                      style={{
+                        border: '1px dashed rgba(148, 163, 184, 0.45)',
+                        borderRadius: '12px',
+                        minHeight: '310px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        color: '#64748b',
+                        padding: '20px',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 700, marginBottom: '6px' }}>No analysis yet</div>
+                        <div>Upload a fruit image to view model output.</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: '10px' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          border: '1px solid rgba(216, 27, 96, 0.18)',
+                          background: 'rgba(253, 242, 248, 0.9)',
+                          borderRadius: '12px',
+                          padding: '12px',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: '0.8rem', color: '#9f1239', fontWeight: 700 }}>Predicted Grade</div>
+                          <div style={{ fontSize: '1.7rem', fontWeight: 900, color: '#be185d', lineHeight: 1 }}>
+                            {String(analysisResult?.grade || 'N/A').toUpperCase()}
                           </div>
                         </div>
-                        <div className="metric">
-                          <div className="metric-header">
-                            <span className="metric-label">Quality score</span>
-                            <span className="metric-value">{Math.round(analysisResult.quality_score)}%</span>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '0.8rem', color: '#334155', fontWeight: 700 }}>Estimated Price</div>
+                          <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f766e' }}>
+                            {toCurrency(analysisResult?.estimated_price_per_kg)}
                           </div>
                         </div>
                       </div>
-                      <div className="result-footer">
-                        <div className="result-stat">
-                          <div className="result-stat-value">{analysisResult.grade}</div>
-                          <div className="result-stat-label">Quality grade</div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '10px', border: '1px solid rgba(148, 163, 184, 0.22)' }}>
+                          <div style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700 }}>Ripeness Score</div>
+                          <div style={{ fontWeight: 800, color: '#0f172a' }}>{toPercent(analysisResult?.ripeness_score)}</div>
+                        </div>
+                        <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '10px', border: '1px solid rgba(148, 163, 184, 0.22)' }}>
+                          <div style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700 }}>Quality Score</div>
+                          <div style={{ fontWeight: 800, color: '#0f172a' }}>{toPercent(analysisResult?.quality_score)}</div>
+                        </div>
+                        <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '10px', border: '1px solid rgba(148, 163, 184, 0.22)' }}>
+                          <div style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700 }}>Detected Area</div>
+                          <div style={{ fontWeight: 800, color: '#0f172a' }}>{toAreaPercent(analysisResult?.fruit_area_ratio)}</div>
+                        </div>
+                        <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '10px', border: '1px solid rgba(148, 163, 184, 0.22)' }}>
+                          <div style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700 }}>Size Category</div>
+                          <div style={{ fontWeight: 800, color: '#0f172a' }}>{analysisResult?.size_category || 'N/A'}</div>
+                        </div>
+                      </div>
+
+                      <div style={{ border: '1px solid rgba(148, 163, 184, 0.22)', borderRadius: '10px', padding: '10px', background: '#fff' }}>
+                        <div style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700 }}>Fruit Type</div>
+                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{analysisResult?.fruit_type || 'Unknown'}</div>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '6px' }}>
+                          {analysisResult?.notes || analysisResult?.shelf_life_label || 'No additional notes.'}
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </section>
       </main>
 
-      {/* NEW FOOTER */}
-      <footer style={{
-        background: 'linear-gradient(135deg, #D81B60, #B8105B)',
-        padding: '32px 0',
-        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-        marginTop: '48px'
-      }}>
-        <div className="container-pro" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '1.3rem', fontWeight: '700', marginBottom: '12px', color: '#fff' }}>🌴 {BRAND_NAME}</div>
-          <p style={{ color: 'rgba(255, 255, 255, 0.9)', margin: '0 0 12px 0' }}>Intelligent Dragon Fruit Detection & Quality Control</p>
-          <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.9rem' }}>© {new Date().getFullYear()} {BRAND_NAME}. All rights reserved.</div>
+      <footer
+        style={{
+          background: 'linear-gradient(135deg, #D81B60, #B8105B)',
+          padding: '30px 0',
+          marginTop: '34px',
+        }}
+      >
+        <div className="container-pro" style={{ textAlign: 'center', color: 'rgba(255,255,255,0.92)' }}>
+          <div style={{ fontSize: '1.15rem', fontWeight: '700', marginBottom: '8px' }}>{BRAND_NAME}</div>
+          <div style={{ fontSize: '0.9rem' }}>Professional AI-based dragonfruit quality analysis</div>
         </div>
       </footer>
     </div>
@@ -210,3 +433,4 @@ function AiAnalysis() {
 }
 
 export default AiAnalysis
+

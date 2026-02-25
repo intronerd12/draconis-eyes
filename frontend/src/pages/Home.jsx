@@ -4,7 +4,8 @@ import toast from 'react-hot-toast'
 import SystemStatus from '../components/SystemStatus'
 import ParallaxDatasetSection from '../components/marketing/ParallaxDatasetSection'
 import { BRAND_NAME } from '../config/brand'
-import { DRAGON_VIGNAN_IMAGES } from '../config/datasetShowcase'
+import { API_BASE_URL } from '../config/api'
+import { WALLPAPER_DRAGON_IMAGES } from '../config/wallpaperDragon'
 import '../App.css'
 
 function Home() {
@@ -30,9 +31,9 @@ function Home() {
   useEffect(() => {
     const checkHealth = async () => {
       try {
-        const res = await fetch('http://localhost:8000/health')
+        const res = await fetch(`${API_BASE_URL}/status`)
         const data = await res.json()
-        setHealth(data.status ?? 'unknown')
+        setHealth(data?.ai_service === 'connected' ? 'healthy' : 'offline')
       } catch {
         setHealth('offline')
       }
@@ -48,18 +49,16 @@ function Home() {
 
   const sections = [
     { id: 'overview', title: 'Overview', path: '/overview', icon: '01', desc: 'System overview and introduction' },
-    { id: 'features', title: 'Features', path: '/user-features', icon: '02', desc: 'Explore system capabilities' },
-    { id: 'analyze', title: 'AI Analysis', path: '/ai-analysis', icon: '03', desc: 'Upload and analyze fruit images' },
-    { id: 'marketplace', title: 'Marketplace', path: '/marketplace', icon: '04', desc: 'Browse sample batches' },
-    { id: 'admin', title: 'Admin Panel', path: '/user-admin', icon: '05', desc: 'Analytics and management tools' },
+    { id: 'analyze', title: 'AI Analysis', path: '/ai-analysis', icon: '02', desc: 'Upload and analyze fruit images' },
+    { id: 'community', title: 'Community Forum', path: '/community', icon: '03', desc: 'Share and discuss scan results with other users' },
   ]
+  const dashboardWallpapers = WALLPAPER_DRAGON_IMAGES.slice(0, 6)
 
   return (
     <div className="app-shell">
       <header>
         <div className="container-pro">
           <div className="logo-section">
-            <span className="logo-icon">DF</span>
             <span className="logo-text">{BRAND_NAME}</span>
           </div>
           <nav>
@@ -88,7 +87,7 @@ function Home() {
       <main style={{ background: 'linear-gradient(135deg, #fdf2f8 0%, #f5f0ff 100%)' }}>
         <section
           className="df-parallax-surface df-parallax-dark"
-          style={{ '--df-bg-image': `url(${DRAGON_VIGNAN_IMAGES[5].src})` }}
+          style={{ '--df-bg-image': `url(${dashboardWallpapers[0]?.src || '/wallpaper-dragon/wallpaper-01.jpeg'})` }}
         >
           <div
             style={{
@@ -151,18 +150,18 @@ function Home() {
 
         <ParallaxDatasetSection
           sectionId="comp-home-vignan-parallax"
-          kicker="Dragon Fruit Vignan.v2i.yolov8"
-          title="Large Dataset Visual Showcase"
-          description="A full-background section powered by your own dragon fruit dataset with smooth parallax while scrolling."
-          images={DRAGON_VIGNAN_IMAGES}
+          kicker="Wallpaper Dragon Gallery"
+          title="High-Resolution Dragonfruit Wallpaper Slider"
+          description="Premium wallpaper visuals to keep the dashboard crisp and professional."
+          images={dashboardWallpapers}
           primaryAction={{ label: 'Run AI Analysis', to: '/ai-analysis' }}
-          secondaryAction={{ label: 'View Marketplace', to: '/marketplace' }}
+          secondaryAction={{ label: 'Open Community', to: '/community' }}
           height={760}
         />
 
         <section
           className="df-parallax-surface df-parallax-light"
-          style={{ '--df-bg-image': `url(${DRAGON_VIGNAN_IMAGES[3].src})` }}
+          style={{ '--df-bg-image': `url(${dashboardWallpapers[1]?.src || '/wallpaper-dragon/wallpaper-02.jpg'})` }}
         >
           <div style={{ padding: '60px 0', background: 'transparent' }}>
             <div className="container-pro">

@@ -33,6 +33,7 @@ app.use('/api/scan', require('./routes/scanRoutes'));
 app.use('/api/weather', require('./routes/weatherroutes'));
 app.use('/api/train', require('./routes/trainRoutes'));
 app.use('/api/chatbot', require('./routes/chatbotRoutes'));
+app.use('/api/community', require('./routes/communityRoutes'));
 
 // Connect to Database
 connectDB();

@@ -4,6 +4,7 @@ import {
   StyleSheet,
   FlatList,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   TouchableOpacity,
   TextInput,
@@ -14,6 +15,7 @@ import { Text, Surface, Chip } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChatbotService } from '../services/ChatbotService';
 import { getUserNamespace, sanitizeForKey } from '../services/storageScope';
@@ -72,6 +74,8 @@ const TypingIndicator = () => {
 
 export default function ChatbotScreen({ navigation, user }) {
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
+  const inputBottomOffset = Math.max(tabBarHeight - insets.bottom + 8, 14);
 
   const storageKey = useMemo(() => {
     const ns = sanitizeForKey(getUserNamespace(user));
@@ -93,6 +97,10 @@ export default function ChatbotScreen({ navigation, user }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const keyboardOffset = Platform.OS === 'android' ? Math.max(keyboardHeight - insets.bottom, 0) : 0;
+  const composerBottomOffset = keyboardOffset > 0 ? keyboardOffset + 8 : inputBottomOffset;
+  const listBottomPadding = keyboardOffset > 0 ? keyboardOffset + 120 : Math.max(tabBarHeight + 96, 150);
 
   useEffect(() => {
     (async () => {
@@ -138,6 +146,25 @@ export default function ChatbotScreen({ navigation, user }) {
     const t = setTimeout(scrollToBottom, 50);
     return () => clearTimeout(t);
   }, [messages, sending]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (event) => {
+      const h = Number(event?.endCoordinates?.height || 0);
+      setKeyboardHeight(Number.isFinite(h) ? h : 0);
+    };
+
+    const onHide = () => setKeyboardHeight(0);
+
+    const showSub = Keyboard.addListener(showEvent, onShow);
+    const hideSub = Keyboard.addListener(hideEvent, onHide);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const send = async (text) => {
     const trimmed = String(text || '').trim();
@@ -260,7 +287,7 @@ export default function ChatbotScreen({ navigation, user }) {
         data={messages}
         keyExtractor={(m) => m.id}
         renderItem={renderMessage}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: listBottomPadding }]}
         onContentSizeChange={scrollToBottom}
         ListFooterComponent={
           sending ? (
@@ -280,9 +307,9 @@ export default function ChatbotScreen({ navigation, user }) {
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 14 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? tabBarHeight + 14 : 0}
       >
-        <View style={[styles.inputWrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <View style={[styles.inputWrap, { paddingBottom: Math.max(insets.bottom, 12), marginBottom: composerBottomOffset }]}>
           <View style={styles.inputInner}>
             <Ionicons name="search" size={18} color={THEME.textLight} />
             <TextInput

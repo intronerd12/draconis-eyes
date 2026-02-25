@@ -276,6 +276,7 @@ export default function ScanScreen({ user }) {
     const displayGrade = isNoFruit ? 'No grade' : (scanResult.grade || '--');
     const displayFruitType = isNoFruit ? 'No dragon fruit detected' : (scanResult.fruit_type || '--');
     const displayNotes = isNoFruit ? 'No results.' : (scanResult.notes || '--');
+    const resultBottomPadding = Math.max(tabBarHeight + 36, 130);
 
     return (
       <View style={styles.resultContainer}>
@@ -290,7 +291,7 @@ export default function ScanScreen({ user }) {
           <View style={{ width: 30 }} />
         </LinearGradient>
 
-        <ScrollView contentContainerStyle={styles.resultContent}>
+        <ScrollView contentContainerStyle={[styles.resultContent, { paddingBottom: resultBottomPadding }]}>
           {scanResult.is_valid_fruit === false && (
             <Surface style={styles.warningCard} elevation={4}>
               <View style={styles.warningContent}>
@@ -950,7 +951,7 @@ const styles = StyleSheet.create({
   },
   scanAgainBtn: {
     marginTop: 10,
-    marginBottom: 30,
+    marginBottom: 8,
     paddingVertical: 8,
     borderRadius: 25,
   },

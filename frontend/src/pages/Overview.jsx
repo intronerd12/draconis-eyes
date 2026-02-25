@@ -1,8 +1,27 @@
 import React from 'react'
 import { BRAND_NAME } from '../config/brand'
+import { WALLPAPER_DRAGON_IMAGES } from '../config/wallpaperDragon'
 import './Landing.css'
 
 function Overview() {
+  const overviewWallpapers = [
+    '/wallpaper-dragon/wallpaper-04.jpg',
+    '/wallpaper-dragon/wallpaper-09.jpg',
+    '/wallpaper-dragon/wallpaper-11.jpg',
+    '/wallpaper-dragon/wallpaper-07.png',
+  ].map((src) => WALLPAPER_DRAGON_IMAGES.find((image) => image.src === src) || { src })
+
+  const sectionBackground = (index, overlay = 'rgba(15, 23, 42, 0.55)') => ({
+    backgroundImage: `linear-gradient(135deg, ${overlay}, rgba(15, 23, 42, 0.32)), url(${overviewWallpapers[index]?.src || '/wallpaper-dragon/wallpaper-01.jpeg'})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    borderRadius: '16px',
+    margin: '24px 0',
+    boxShadow: '0 16px 40px rgba(15, 23, 42, 0.2)',
+    border: '1px solid rgba(255,255,255,0.18)',
+  })
+
   return (
     <div className="app-shell">
       {/* HEADER */}
@@ -26,10 +45,8 @@ function Overview() {
           <nav style={{ display: 'flex', gap: '32px', flex: 1, alignItems: 'center' }}>
             {[
               { path: '/overview', label: 'Overview', icon: '🏠' },
-              { path: '/user-features', label: 'Features', icon: '✨' },
               { path: '/ai-analysis', label: 'AI Analysis', icon: '🧪' },
-              { path: '/marketplace', label: 'Marketplace', icon: '🛒' },
-              { path: '/user-admin', label: 'Admin', icon: '⚙️' }
+              { path: '/community', label: 'Community', icon: '👥' }
             ].map(item => {
               const isActive = window.location.pathname === item.path
               return (
@@ -67,14 +84,12 @@ function Overview() {
         </div>
       </header>
 
-      {/* HERO */}
+        {/* HERO */}
       <main>
         <section className="lp-hero page-hero-pro" style={{
-          background: 'linear-gradient(135deg, #D81B60, #e85d93)',
+          ...sectionBackground(0, 'rgba(216, 27, 96, 0.66)'),
           padding: '80px 0',
           color: '#fff',
-          borderRadius: '16px',
-          margin: '24px 0'
         }}>
           <div className="container-pro lp-hero-grid" style={{ display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap' }}>
             <div className="lp-hero-copy" style={{ flex: '1', minWidth: '280px' }}>
@@ -116,7 +131,7 @@ function Overview() {
                 >
                   Start Analysis →
                 </a>
-                <a href="/user-features" style={{
+                <a href="/community" style={{
                   padding: '12px 24px',
                   border: '2px solid #fff',
                   color: '#fff',
@@ -134,24 +149,20 @@ function Overview() {
                     e.currentTarget.style.color = '#fff'
                   }}
                 >
-                  Learn Features
+                  Join Community
                 </a>
               </div>
-            </div>
-            <div className="lp-hero-image" style={{ flex: '1', textAlign: 'center', minWidth: '200px' }}>
-              <div style={{
-                fontSize: '120px',
-                lineHeight: '1',
-                filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.2))'
-              }}>🐲</div>
             </div>
           </div>
         </section>
 
         {/* HOW IT WORKS */}
-        <section className="lp-section">
+        <section className="lp-section" style={{
+          ...sectionBackground(1, 'rgba(30, 41, 59, 0.72)'),
+          padding: '60px 0',
+        }}>
           <div className="container-pro">
-            <h2 className="section-title">How It Works</h2>
+            <h2 className="section-title" style={{ color: '#fff' }}>How It Works</h2>
             <div className="lp-workflow" style={{ display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: '24px' }}>
               {[
                 { num: '1', title: 'Capture', desc: 'Take a photo of your dragon fruit in natural lighting' },
@@ -164,7 +175,12 @@ function Overview() {
                   flexDirection: 'column',
                   alignItems: 'center',
                   textAlign: 'center',
-                  gap: '12px'
+                  gap: '12px',
+                  background: 'rgba(255,255,255,0.92)',
+                  borderRadius: '16px',
+                  padding: '20px 16px',
+                  border: '1px solid rgba(255,255,255,0.35)',
+                  minWidth: '180px',
                 }}>
                   <div className="guide-step-number" style={{
                     width: '60px',
@@ -187,9 +203,12 @@ function Overview() {
         </section>
 
         {/* KEY CAPABILITIES */}
-        <section className="lp-section lp-section-alt" style={{ background: '#fdf2f7' }}>
+        <section className="lp-section lp-section-alt" style={{
+          ...sectionBackground(2, 'rgba(49, 46, 129, 0.62)'),
+          padding: '60px 0',
+        }}>
           <div className="container-pro">
-            <h2 className="section-title">Key Capabilities</h2>
+            <h2 className="section-title" style={{ color: '#fff' }}>Key Capabilities</h2>
             <div className="lp-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '24px' }}>
               {[
                 { icon: '🔍', title: 'Computer Vision', desc: 'Advanced fruit detection and segmentation using deep learning models' },
@@ -201,12 +220,13 @@ function Overview() {
               ].map((item, i) => (
                 <div key={i} className="guide-card-pro" style={{
                   padding: '32px',
-                  background: '#fff',
-                  borderRadius: '12px',
-                  border: '1px solid #f0f0f0',
+                  background: 'rgba(255,255,255,0.93)',
+                  borderRadius: '14px',
+                  border: '1px solid rgba(255,255,255,0.34)',
                   textAlign: 'center',
                   transition: 'all 0.3s ease',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  boxShadow: '0 8px 22px rgba(15, 23, 42, 0.16)',
                 }}>
                   <div style={{ fontSize: '48px', marginBottom: '16px' }}>{item.icon}</div>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: '700', margin: '0 0 8px 0', color: '#D81B60' }}>{item.title}</h3>
@@ -218,15 +238,18 @@ function Overview() {
         </section>
 
         {/* GET STARTED */}
-        <section className="lp-section">
+        <section className="lp-section" style={{
+          ...sectionBackground(3, 'rgba(30, 41, 59, 0.65)'),
+          padding: '60px 0',
+        }}>
           <div className="container-pro" style={{ textAlign: 'center' }}>
-            <h2 className="section-title">Ready to Get Started?</h2>
-            <p style={{ fontSize: '1.1rem', color: '#6b7280', maxWidth: '600px', margin: '0 auto 32px' }}>
+            <h2 className="section-title" style={{ color: '#fff' }}>Ready to Get Started?</h2>
+            <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.9)', maxWidth: '600px', margin: '0 auto 32px' }}>
               Upload an image of your dragon fruit and get instant analysis results. Try it now with our AI system.
             </p>
             <a href="/ai-analysis" style={{
               padding: '12px 28px',
-              background: 'linear-gradient(135deg, #D81B60, #e85d93)',
+              background: 'linear-gradient(135deg, #D81B60, #BE185D)',
               color: '#fff',
               borderRadius: '8px',
               fontWeight: '600',

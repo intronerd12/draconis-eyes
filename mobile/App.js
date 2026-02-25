@@ -18,6 +18,7 @@ import GuideScreen from './screens/GuideScreen';
 import WeatherScreen from './screens/WeatherScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
 import MappingEnvironmentScreen from './screens/MappingEnvironmentScreen';
+import CommunityForumScreen from './screens/CommunityForumScreen';
 
 import { clearEnvironmentCaches } from './services/EnvironmentService';
 import { getUserNamespace, sanitizeForKey } from './services/storageScope';
@@ -74,6 +75,7 @@ function MainTabs({ user, handleLogout }) {
         tabBarActiveTintColor: NAV_THEME.active,
         tabBarInactiveTintColor: NAV_THEME.inactive,
         tabBarShowLabel: false,
+        tabBarHideOnKeyboard: true,
         tabBarStyle: styles.tabBar,
         tabBarItemStyle: styles.tabBarItem,
         headerShown: false,
@@ -166,6 +168,9 @@ export default function App() {
             </Stack.Screen>
             <Stack.Screen name="EditProfile">
               {props => <EditProfileScreen {...props} onUpdateUser={handleUpdateUser} />}
+            </Stack.Screen>
+            <Stack.Screen name="CommunityForum">
+              {props => <CommunityForumScreen {...props} user={user} />}
             </Stack.Screen>
           </Stack.Navigator>
         ) : (

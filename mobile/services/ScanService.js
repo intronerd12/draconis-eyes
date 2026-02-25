@@ -1,11 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
-import { API_URL } from './api';
+import { apiFetch } from './api';
 
 import { getUserNamespace, sanitizeForKey } from './storageScope';
 
 const STORAGE_KEY_BASE = 'dragon_scans_v1';
 const PENDING_KEY_BASE = 'dragon_scan_pending_ops_v1';
+const MAX_SCANS_STORED = 120;
+const MAX_SCANS_STORAGE_BYTES = 1_600_000;
 
 const activeFlushByKey = new Map();
 
@@ -102,6 +104,86 @@ const safeReadJson = async (res) => {
   }
 };
 
+const toFiniteNumber = (value, fallback = 0) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const truncateText = (value, maxLength = 280) => {
+  const text = typeof value === 'string' ? value : String(value ?? '');
+  return text.length <= maxLength ? text : `${text.slice(0, Math.max(0, maxLength - 1))}\u2026`;
+};
+
+const estimateStringBytes = (value) => {
+  try {
+    return new Blob([String(value ?? '')]).size;
+  } catch {
+    return String(value ?? '').length * 2;
+  }
+};
+
+const isStorageOverflowError = (error) => {
+  const message = String(error?.message || error || '').toLowerCase();
+  return (
+    message.includes('cursorwindow') ||
+    message.includes('row too big') ||
+    message.includes('database or disk is full')
+  );
+};
+
+const sanitizeScanForStorage = (scan) => {
+  if (!scan || typeof scan !== 'object') return scan;
+
+  const recommendations = Array.isArray(scan.recommendations)
+    ? scan.recommendations
+        .filter((item) => typeof item === 'string' && item.trim().length > 0)
+        .slice(0, 4)
+        .map((item) => truncateText(item, 140))
+    : [];
+
+  return {
+    id: scan.id,
+    timestamp: scan.timestamp,
+    imageUri: scan.imageUri,
+    grade: scan.grade,
+    notes: truncateText(scan.notes || scan.details || '', 320),
+    fruit_type: truncateText(scan.fruit_type || scan.fruitType || '', 120),
+    is_valid_fruit: scan.is_valid_fruit,
+    warning_message: truncateText(scan.warning_message || '', 200),
+    estimated_price_per_kg: toFiniteNumber(scan.estimated_price_per_kg, 0),
+    fruit_area_ratio: toFiniteNumber(scan.fruit_area_ratio, 0),
+    size_category: scan.size_category || 'N/A',
+    market_value_label: scan.market_value_label || 'N/A',
+    weight_grams_est: Math.round(toFiniteNumber(scan.weight_grams_est, 0)),
+    shelf_life_label: scan.shelf_life_label || 'No result',
+    disease_status: truncateText(scan.disease_status || '', 120),
+    defect_level: scan.defect_level || 'none',
+    ripeness_score: Math.round(toFiniteNumber(scan.ripeness_score, 0)),
+    quality_score: Math.round(toFiniteNumber(scan.quality_score, 0)),
+    harvest_stage: scan.harvest_stage || 'No result',
+    recommendations,
+    location: scan.location || null,
+  };
+};
+
+const enforceStorageBudget = (scans) => {
+  let normalized = (Array.isArray(scans) ? scans : []).map(sanitizeScanForStorage).slice(0, MAX_SCANS_STORED);
+  let serialized = JSON.stringify(normalized);
+
+  while (normalized.length > 0 && estimateStringBytes(serialized) > MAX_SCANS_STORAGE_BYTES) {
+    normalized = normalized.slice(0, normalized.length - 1);
+    serialized = JSON.stringify(normalized);
+  }
+
+  return { scans: normalized, serialized };
+};
+
+const persistScans = async (scans, user) => {
+  const { scans: pruned, serialized } = enforceStorageBudget(scans);
+  await AsyncStorage.setItem(getStorageKey(user), serialized);
+  return pruned;
+};
+
 const buildScanPayload = (scan, user) => {
   const { userId, userName, userEmail } = resolveUserMeta(user);
   return {
@@ -129,7 +211,7 @@ const syncScanPayloadToBackend = async (payload, { user } = {}) => {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_URL}/api/scan`, {
+  const res = await apiFetch('/api/scan', {
     method: 'POST',
     headers,
     body: JSON.stringify(payload),
@@ -157,13 +239,13 @@ const deleteScanFromBackend = async (localScanId, { user } = {}) => {
   if (userEmail) query.set('operatorEmail', userEmail);
   const queryString = query.toString();
 
-  const url = `${API_URL}/api/scan/${encodeURIComponent(id)}${queryString ? `?${queryString}` : ''}`;
+  const url = `/api/scan/${encodeURIComponent(id)}${queryString ? `?${queryString}` : ''}`;
   const headers = { Accept: 'application/json' };
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(url, {
+  const res = await apiFetch(url, {
     method: 'DELETE',
     headers,
   });
@@ -254,7 +336,7 @@ export const ScanService = {
       });
       formData.append('client', 'mobile');
 
-      const response = await fetch(`${API_URL}/api/scan/analyze`, {
+      const response = await apiFetch('/api/scan/analyze', {
         method: 'POST',
         body: formData,
         headers: {
@@ -287,7 +369,7 @@ export const ScanService = {
         formData.append('source', String(source));
       }
 
-      const response = await fetch(`${API_URL}/api/train/upload`, {
+      const response = await apiFetch('/api/train/upload', {
         method: 'POST',
         body: formData,
         headers: {
@@ -328,9 +410,32 @@ export const ScanService = {
     try {
       const jsonValue = await AsyncStorage.getItem(getStorageKey(user));
       void ScanService.flushPendingSync({ user });
-      return jsonValue != null ? JSON.parse(jsonValue) : [];
+      const parsed = jsonValue != null ? safeParseArray(jsonValue) : [];
+      if (!parsed.length) return [];
+
+      const needsCompaction = parsed.some(
+        (scan) =>
+          scan &&
+          typeof scan === 'object' &&
+          (typeof scan.segmentation_preview_base64 === 'string' ||
+            Array.isArray(scan.detections) ||
+            Array.isArray(scan.disease_detections))
+      );
+
+      if (needsCompaction || parsed.length > MAX_SCANS_STORED) {
+        const compacted = await persistScans(parsed, user);
+        return compacted;
+      }
+
+      return parsed;
     } catch (e) {
       console.error('Error reading scans', e);
+      if (isStorageOverflowError(e)) {
+        try {
+          await AsyncStorage.removeItem(getStorageKey(user));
+          console.warn('Cleared oversized scan history row from local storage.');
+        } catch {}
+      }
       return [];
     }
   },
@@ -364,8 +469,7 @@ export const ScanService = {
 
     try {
       const currentScans = await ScanService.getScans({ user });
-      const updatedScans = [newScan, ...currentScans];
-      await AsyncStorage.setItem(getStorageKey(user), JSON.stringify(updatedScans));
+      await persistScans([newScan, ...currentScans], user);
     } catch (e) {
       console.error('Error saving scan locally', e);
     }
@@ -419,7 +523,6 @@ export const ScanService = {
 
   deleteScan: async (scanId, { user } = {}) => {
     try {
-      const key = getStorageKey(user);
       const currentScans = await ScanService.getScans({ user });
       const idStr = String(scanId);
       const idx = currentScans.findIndex((s) => String(s?.id) === idStr);
@@ -427,7 +530,7 @@ export const ScanService = {
       if (idx >= 0) {
         const removed = currentScans[idx];
         const updatedScans = [...currentScans.slice(0, idx), ...currentScans.slice(idx + 1)];
-        await AsyncStorage.setItem(key, JSON.stringify(updatedScans));
+        await persistScans(updatedScans, user);
 
         const uri = removed?.imageUri;
         if (typeof uri === 'string' && uri.length > 0) {

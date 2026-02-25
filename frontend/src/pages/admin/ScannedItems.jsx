@@ -1,6 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import {
+  RefreshCcw,
+  ScanLine,
+  Users,
+  Trophy,
+  Clock3,
+  CalendarClock,
+  UserRound,
+  MapPin,
+  FileText,
+  Smartphone,
+} from 'lucide-react';
 import { API_BASE_URL } from '../../config/api';
+import './ScannedItems.css';
 
 const AUTO_REFRESH_MS = 5000;
 
@@ -10,6 +23,18 @@ const formatDateTime = (value) => {
   if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleString();
 };
+const formatTimeOnly = (value) => {
+  if (!value) return '--';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '--';
+  return date.toLocaleTimeString();
+};
+const formatDateOnly = (value) => {
+  if (!value) return '--';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '--';
+  return date.toLocaleDateString();
+};
 
 const getOperatorIdentity = (scan) => {
   const id = scan?.user?._id || scan?.user?.id || scan?.operatorEmail || scan?.operatorName || null;
@@ -18,11 +43,34 @@ const getOperatorIdentity = (scan) => {
 
 const getGradePill = (gradeRaw) => {
   const grade = String(gradeRaw || '').toUpperCase();
-  if (grade === 'A') return { grade, bg: '#dcfce7', fg: '#166534' };
-  if (grade === 'B') return { grade, bg: '#dbeafe', fg: '#1e40af' };
-  if (grade === 'C') return { grade, bg: '#fef9c3', fg: '#92400e' };
-  if (grade === 'UNKNOWN' || !grade) return { grade: 'N/A', bg: '#f1f5f9', fg: '#334155' };
-  return { grade, bg: '#fee2e2', fg: '#991b1b' };
+  if (grade === 'A') return { grade, className: 'si-grade si-grade-a' };
+  if (grade === 'B') return { grade, className: 'si-grade si-grade-b' };
+  if (grade === 'C') return { grade, className: 'si-grade si-grade-c' };
+  if (grade === 'D') return { grade, className: 'si-grade si-grade-d' };
+  if (grade === 'E') return { grade, className: 'si-grade si-grade-e' };
+  if (grade === 'UNKNOWN' || !grade || grade === 'N/A') return { grade: 'N/A', className: 'si-grade si-grade-na' };
+  return { grade, className: 'si-grade si-grade-na' };
+};
+
+const getSourceLabel = (sourceRaw) => {
+  const source = String(sourceRaw || 'unspecified').trim().toLowerCase();
+  if (source.includes('mobile')) return 'Mobile App';
+  if (source.includes('web')) return 'Web';
+  if (!source || source === 'unspecified') return 'Unspecified';
+  return sourceRaw;
+};
+
+const getSafeLocation = (locationValue) => {
+  if (!locationValue) return '-';
+  if (typeof locationValue === 'string') return locationValue;
+  if (typeof locationValue === 'object') {
+    const lat = locationValue.lat ?? locationValue.latitude;
+    const lng = locationValue.lng ?? locationValue.longitude;
+    if (typeof lat === 'number' && typeof lng === 'number') {
+      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+  }
+  return '-';
 };
 
 const ScannedItems = () => {
@@ -85,154 +133,144 @@ const ScannedItems = () => {
     [scans]
   );
 
+  const gradeBreakdown = useMemo(() => {
+    const seed = { A: 0, B: 0, C: 0, D: 0, E: 0, NA: 0 };
+    scans.forEach((scan) => {
+      const grade = String(scan?.grade || '').toUpperCase();
+      if (grade === 'A' || grade === 'B' || grade === 'C' || grade === 'D' || grade === 'E') {
+        seed[grade] += 1;
+      } else {
+        seed.NA += 1;
+      }
+    });
+    return seed;
+  }, [scans]);
+
+  const sourceBreakdown = useMemo(() => {
+    const bucket = {};
+    scans.forEach((scan) => {
+      const label = getSourceLabel(scan?.source || 'unspecified');
+      bucket[label] = (bucket[label] || 0) + 1;
+    });
+    return Object.entries(bucket).sort((a, b) => b[1] - a[1]);
+  }, [scans]);
+
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 22, gap: 16, flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--gray-800)', marginBottom: 6 }}>Scanned Items</div>
-          <div style={{ color: 'var(--gray-500)' }}>Unified scan feed from all mobile users and operators.</div>
-          <div style={{ color: 'var(--gray-400)', fontSize: '0.82rem', marginTop: 6 }}>
+    <div className="si-page">
+      <section className="si-hero">
+        <div className="si-hero-copy">
+          <h1 className="si-title">Scanned Items</h1>
+          <p className="si-subtitle">Unified scan feed from all mobile users and operators.</p>
+          <p className="si-meta">
             Auto-refresh every {Math.floor(AUTO_REFRESH_MS / 1000)}s {lastUpdated ? `| Last updated: ${lastUpdated.toLocaleTimeString()}` : ''}
-          </div>
+          </p>
         </div>
         <button
           type="button"
           onClick={() => fetchScans()}
           disabled={loading || refreshing}
-          style={{
-            padding: '8px 14px',
-            borderRadius: 999,
-            border: '1px solid var(--gray-200)',
-            backgroundColor: 'white',
-            color: 'var(--gray-700)',
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            cursor: loading || refreshing ? 'default' : 'pointer',
-            opacity: loading || refreshing ? 0.6 : 1,
-          }}
+          className="si-refresh-btn"
         >
+          <RefreshCcw size={15} className={refreshing ? 'si-spin' : ''} />
           {refreshing ? 'Refreshing...' : 'Refresh now'}
         </button>
-      </div>
+      </section>
 
       {!loading && scans.length > 0 && (
-        <div style={{ display: 'flex', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
-          <div
-            style={{
-              flex: '0 0 180px',
-              backgroundColor: 'white',
-              borderRadius: 14,
-              border: '1px solid var(--gray-100)',
-              boxShadow: 'var(--shadow-sm)',
-              padding: '14px 16px',
-            }}
-          >
-            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--gray-400)', fontWeight: 700, marginBottom: 4 }}>
-              Total scans
+        <section className="si-stats-grid">
+          <article className="si-stat-card">
+            <div className="si-stat-top">
+              <span className="si-stat-label">Total scans</span>
+              <span className="si-stat-icon">
+                <ScanLine size={16} />
+              </span>
             </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--gray-800)' }}>{stats?.total || scans.length}</div>
-          </div>
-          <div
-            style={{
-              flex: '0 0 220px',
-              backgroundColor: 'white',
-              borderRadius: 14,
-              border: '1px solid var(--gray-100)',
-              boxShadow: 'var(--shadow-sm)',
-              padding: '14px 16px',
-            }}
-          >
-            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--gray-400)', fontWeight: 700, marginBottom: 4 }}>
-              Unique operators
+            <div className="si-stat-value">{stats?.total || scans.length}</div>
+          </article>
+
+          <article className="si-stat-card">
+            <div className="si-stat-top">
+              <span className="si-stat-label">Unique operators</span>
+              <span className="si-stat-icon">
+                <Users size={16} />
+              </span>
             </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--gray-800)' }}>{uniqueOperators}</div>
-          </div>
-          <div
-            style={{
-              flex: '0 0 260px',
-              backgroundColor: 'white',
-              borderRadius: 14,
-              border: '1px solid var(--gray-100)',
-              boxShadow: 'var(--shadow-sm)',
-              padding: '14px 16px',
-            }}
-          >
-            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--gray-400)', fontWeight: 700, marginBottom: 4 }}>
-              Last scan
+            <div className="si-stat-value">{uniqueOperators}</div>
+          </article>
+
+          <article className="si-stat-card">
+            <div className="si-stat-top">
+              <span className="si-stat-label">Last scan</span>
+              <span className="si-stat-icon">
+                <Clock3 size={16} />
+              </span>
             </div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--gray-700)' }}>
+            <div className="si-stat-value si-stat-value-sm">
               {formatDateTime(scans[0]?.timestamp || scans[0]?.createdAt)}
             </div>
-          </div>
-          <div
-            style={{
-              flex: '0 0 220px',
-              backgroundColor: 'white',
-              borderRadius: 14,
-              border: '1px solid var(--gray-100)',
-              boxShadow: 'var(--shadow-sm)',
-              padding: '14px 16px',
-            }}
-          >
-            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--gray-400)', fontWeight: 700, marginBottom: 4 }}>
-              Best grade
+          </article>
+
+          <article className="si-stat-card">
+            <div className="si-stat-top">
+              <span className="si-stat-label">Best grade</span>
+              <span className="si-stat-icon">
+                <Trophy size={16} />
+              </span>
             </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--gray-800)' }}>
-              {(stats?.best || '-').toString().toUpperCase()}
+            <div className="si-stat-value">{(stats?.best || '-').toString().toUpperCase()}</div>
+          </article>
+        </section>
+      )}
+
+      {!loading && scans.length > 0 && (
+        <section className="si-toolbar">
+          <div className="si-toolbar-group">
+            <span className="si-toolbar-label">Grade mix</span>
+            <div className="si-chip-row">
+              <span className="si-chip">A {gradeBreakdown.A}</span>
+              <span className="si-chip">B {gradeBreakdown.B}</span>
+              <span className="si-chip">C {gradeBreakdown.C}</span>
+              <span className="si-chip">D {gradeBreakdown.D}</span>
+              <span className="si-chip">E {gradeBreakdown.E}</span>
+              <span className="si-chip">N/A {gradeBreakdown.NA}</span>
             </div>
           </div>
-        </div>
+          <div className="si-toolbar-group">
+            <span className="si-toolbar-label">Sources</span>
+            <div className="si-chip-row">
+              {sourceBreakdown.map(([label, count]) => (
+                <span key={label} className="si-chip">
+                  <Smartphone size={13} />
+                  {label} {count}
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
       )}
 
       {loading ? (
-        <div
-          style={{
-            backgroundColor: 'white',
-            borderRadius: 14,
-            boxShadow: 'var(--shadow-sm)',
-            border: '1px solid var(--gray-100)',
-            height: 240,
-            display: 'grid',
-            placeItems: 'center',
-            color: 'var(--gray-500)',
-            fontWeight: 700,
-          }}
-        >
-          Loading scans...
+        <div className="si-empty-card">
+          <div className="si-empty-title">Loading scans...</div>
         </div>
       ) : scans.length === 0 ? (
-        <div
-          style={{
-            backgroundColor: 'white',
-            borderRadius: 14,
-            boxShadow: 'var(--shadow-sm)',
-            border: '1px solid var(--gray-100)',
-            padding: '32px 28px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
-          <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--gray-800)' }}>No scans recorded yet</div>
-          <div style={{ fontSize: '0.9rem', color: 'var(--gray-500)', textAlign: 'center', maxWidth: 520 }}>
+        <div className="si-empty-card">
+          <div className="si-empty-title">No scans recorded yet</div>
+          <div className="si-empty-desc">
             Once users scan dragon fruit in the mobile app, records will appear here with grade, operator, and source details.
           </div>
         </div>
       ) : (
-        <div style={{ backgroundColor: 'white', borderRadius: 14, boxShadow: 'var(--shadow-sm)', overflow: 'hidden', border: '1px solid var(--gray-100)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div className="si-table-shell">
+          <table className="si-table">
             <thead>
-              <tr style={{ backgroundColor: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)' }}>
-                <th style={{ padding: '14px 16px', fontWeight: 800, color: 'var(--gray-600)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Date</th>
-                <th style={{ padding: '14px 16px', fontWeight: 800, color: 'var(--gray-600)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Grade</th>
-                <th style={{ padding: '14px 16px', fontWeight: 800, color: 'var(--gray-600)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Fruit and notes</th>
-                <th style={{ padding: '14px 16px', fontWeight: 800, color: 'var(--gray-600)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Operator</th>
-                <th style={{ padding: '14px 16px', fontWeight: 800, color: 'var(--gray-600)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Location</th>
-                <th style={{ padding: '14px 16px', fontWeight: 800, color: 'var(--gray-600)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Source</th>
+              <tr>
+                <th>Date</th>
+                <th>Grade</th>
+                <th>Fruit and notes</th>
+                <th>Operator</th>
+                <th>Location</th>
+                <th>Source</th>
               </tr>
             </thead>
             <tbody>
@@ -240,39 +278,52 @@ const ScannedItems = () => {
                 const pill = getGradePill(scan.grade);
                 const operatorName = scan?.user?.name || scan?.operatorName || 'Unknown operator';
                 const operatorEmail = scan?.user?.email || scan?.operatorEmail || '-';
-                const fruitNotes = [scan?.fruitType, scan?.details].filter(Boolean).join(' | ') || '-';
+                const fruitName = scan?.fruitType || 'No fruit data';
+                const scanNotes = scan?.details || 'No notes provided';
+                const created = scan.timestamp || scan.createdAt;
 
                 return (
-                  <tr key={scan._id || scan.id} style={{ borderBottom: '1px solid var(--gray-100)' }}>
-                    <td style={{ padding: '14px 16px', color: 'var(--gray-600)', fontSize: '0.9rem' }}>
-                      {formatDateTime(scan.timestamp || scan.createdAt)}
+                  <tr key={scan._id || scan.id || `${scan?.timestamp || ''}-${scan?.operatorEmail || ''}`}>
+                    <td>
+                      <div className="si-cell-stack">
+                        <div className="si-cell-primary">
+                          <CalendarClock size={14} />
+                          {formatDateOnly(created)}
+                        </div>
+                        <div className="si-cell-secondary">{formatTimeOnly(created)}</div>
+                      </div>
                     </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          padding: '4px 10px',
-                          borderRadius: 999,
-                          backgroundColor: pill.bg,
-                          color: pill.fg,
-                          fontSize: '0.8rem',
-                          fontWeight: 900,
-                        }}
-                      >
+                    <td>
+                      <span className={pill.className}>
                         {pill.grade}
                       </span>
                     </td>
-                    <td style={{ padding: '14px 16px', color: 'var(--gray-600)', fontSize: '0.9rem' }}>{fruitNotes}</td>
-                    <td style={{ padding: '14px 16px', color: 'var(--gray-600)', fontSize: '0.9rem' }}>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{operatorName}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>{operatorEmail}</div>
+                    <td>
+                      <div className="si-cell-stack">
+                        <div className="si-cell-primary">
+                          <FileText size={14} />
+                          {fruitName}
+                        </div>
+                        <div className="si-cell-secondary si-notes">{scanNotes}</div>
                       </div>
                     </td>
-                    <td style={{ padding: '14px 16px', color: 'var(--gray-600)', fontSize: '0.9rem' }}>{scan.location || '-'}</td>
-                    <td style={{ padding: '14px 16px', color: 'var(--gray-600)', fontSize: '0.9rem' }}>
-                      {scan.source || 'unspecified'}
+                    <td>
+                      <div className="si-cell-stack">
+                        <div className="si-cell-primary">
+                          <UserRound size={14} />
+                          {operatorName}
+                        </div>
+                        <div className="si-cell-secondary">{operatorEmail}</div>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="si-cell-primary">
+                        <MapPin size={14} />
+                        {getSafeLocation(scan.location)}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="si-source-pill">{getSourceLabel(scan.source)}</span>
                     </td>
                   </tr>
                 );

@@ -1,6 +1,6 @@
 import { ScanService } from './ScanService';
 import { getEnvironment, getEnvironmentalReport } from './EnvironmentService';
-import { API_URL } from './api';
+import { apiFetch } from './api';
 
 const normalize = (s) => String(s || '').trim();
 const normLower = (s) => normalize(s).toLowerCase();
@@ -188,7 +188,7 @@ export const ChatbotService = {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/chatbot`, {
+      const response = await apiFetch('/api/chatbot', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
