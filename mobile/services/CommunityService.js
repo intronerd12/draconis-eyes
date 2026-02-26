@@ -95,9 +95,15 @@ const buildScanSnapshot = (scan) => {
 
 export const CommunityService = {
   getPosts: async ({ limit = 60 } = {}) => {
-    const res = await apiFetch(`/api/community?limit=${encodeURIComponent(String(limit))}`, {
+    const ts = new Date().getTime();
+    const res = await apiFetch(`/api/community?limit=${encodeURIComponent(String(limit))}&_t=${ts}`, {
       method: 'GET',
-      headers: { Accept: 'application/json' },
+      headers: { 
+        Accept: 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      },
     });
 
     const data = await safeReadJson(res);
@@ -214,6 +220,56 @@ export const CommunityService = {
       throw new Error(data?.message || 'Failed to toggle reaction');
     }
     return data;
+  },
+
+  deletePost: async ({ user, postId } = {}) => {
+    const cleanPostId = normalizeText(postId);
+    if (!cleanPostId) {
+      throw new Error('postId is required');
+    }
+    const userMeta = getUserMeta(user);
+    let res = await apiFetch(`/api/community/${encodeURIComponent(cleanPostId)}`, {
+      method: 'DELETE',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-User-Id': userMeta.userId || '',
+        'X-User-Email': userMeta.authorEmail || '',
+      },
+      body: JSON.stringify({
+        userId: userMeta.userId,
+        authorEmail: userMeta.authorEmail,
+      }),
+    });
+
+    if (res.status === 404) {
+      return { message: 'Post already deleted' };
+    }
+
+    if (!res.ok) {
+      // Fallback for environments that disallow DELETE with body
+      res = await apiFetch(`/api/community/${encodeURIComponent(cleanPostId)}/delete`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'X-User-Id': userMeta.userId || '',
+          'X-User-Email': userMeta.authorEmail || '',
+        },
+        body: JSON.stringify({
+          userId: userMeta.userId,
+          authorEmail: userMeta.authorEmail,
+        }),
+      });
+    }
+
+    if (res.status === 404) {
+      return { message: 'Post already deleted' };
+    }
+
+    const data = await safeReadJson(res);
+    if (!res.ok) throw new Error(data?.message || 'Failed to delete post');
+    return data || { message: 'Post deleted' };
   },
 
   getNotifications: async ({ user, limit = 40 } = {}) => {

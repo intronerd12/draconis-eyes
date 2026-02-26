@@ -119,7 +119,7 @@ function CommunityForum() {
 
   const loadData = useCallback(async () => {
     setLoading(true)
-    const postsReq = fetch(`${API_BASE_URL}/api/community?limit=70`).then(async (res) => {
+    const postsReq = fetch(`${API_BASE_URL}/api/community?limit=70`, { cache: 'no-store' }).then(async (res) => {
       const data = await res.json()
       if (!res.ok) throw new Error(data?.message || 'Failed to load community posts')
       return Array.isArray(data) ? data : []
@@ -315,6 +315,88 @@ function CommunityForum() {
       setNotifications((prev) => prev.map((item) => ({ ...item, readAt: item.readAt || new Date().toISOString() })))
     } catch (err) {
       void err
+    }
+  }
+
+  const canDeletePost = (post) => {
+    const byUser = userMeta.userId && String(post?.user?._id || post?.user || '') === String(userMeta.userId)
+    const byEmail = userMeta.authorEmail && asText(post?.authorEmail).toLowerCase() === userMeta.authorEmail
+    return Boolean(byUser || byEmail)
+  }
+
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+
+  const confirmDeletePost = (post) => {
+    setDeleteTarget(post)
+    setDeleteOpen(true)
+  }
+
+  const handleDeletePost = async (post) => {
+    const rawId = String(post?._id || post?.id || '')
+    const postId = rawId.trim()
+    if (!postId) return
+
+    console.log('Attempting to delete post:', postId)
+
+    try {
+      let res = await fetch(`${API_BASE_URL}/api/community/${encodeURIComponent(postId)}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': userMeta.userId || '',
+          'X-User-Email': userMeta.authorEmail || '',
+        },
+        body: JSON.stringify({
+          userId: userMeta.userId,
+          authorEmail: userMeta.authorEmail,
+        }),
+      })
+
+      if (res.status === 404) {
+        // If post not found, consider it deleted
+        setPosts((prev) => prev.filter((p) => String(p?._id || p?.id) !== postId))
+        toast.success('Post deleted')
+        setDeleteOpen(false)
+        setDeleteTarget(null)
+        return
+      }
+
+      if (!res.ok) {
+        res = await fetch(`${API_BASE_URL}/api/community/${encodeURIComponent(postId)}/delete`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-User-Id': userMeta.userId || '',
+            'X-User-Email': userMeta.authorEmail || '',
+          },
+          body: JSON.stringify({
+            userId: userMeta.userId,
+            authorEmail: userMeta.authorEmail,
+          }),
+        })
+      }
+      
+      if (res.status === 404) {
+         setPosts((prev) => prev.filter((p) => String(p?._id || p?.id) !== postId))
+         toast.success('Post deleted')
+         setDeleteOpen(false)
+         setDeleteTarget(null)
+         return
+      }
+
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.message || 'Failed to delete post')
+      
+      setPosts((prev) => prev.filter((p) => String(p?._id || p?.id) !== postId))
+      toast.success('Post deleted')
+      setDeleteOpen(false)
+      setDeleteTarget(null)
+      
+      // Force reload to ensure consistency with backend
+      void loadData()
+    } catch (err) {
+      toast.error(err?.message || 'Could not delete post')
     }
   }
 
@@ -538,7 +620,26 @@ function CommunityForum() {
                     <article key={id} style={{ background: '#fff', border: '1px solid rgba(16,25,39,0.08)', borderRadius: '14px', padding: '14px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
                         <div style={{ fontWeight: 700 }}>{asText(post?.authorName, 'Anonymous User')}</div>
-                        <div style={{ color: '#64748b', fontSize: '0.85rem' }}>{formatDate(post?.createdAt)}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ color: '#64748b', fontSize: '0.85rem' }}>{formatDate(post?.createdAt)}</div>
+                          {canDeletePost(post) ? (
+                            <button
+                              type="button"
+                              onClick={() => confirmDeletePost(post)}
+                              style={{
+                                border: '1px solid rgba(16,25,39,0.12)',
+                                background: '#fff',
+                                color: '#b91c1c',
+                                borderRadius: '6px',
+                                padding: '6px 10px',
+                                cursor: 'pointer',
+                                fontWeight: 700,
+                              }}
+                            >
+                              Delete
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                       {post?.authorEmail ? <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '2px' }}>{post.authorEmail}</div> : null}
                       {post?.text ? <p style={{ marginTop: '10px', marginBottom: '10px', lineHeight: 1.6 }}>{post.text}</p> : null}
@@ -670,12 +771,79 @@ function CommunityForum() {
           </div>
         </section>
       </main>
+      {deleteOpen ? (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(16,25,39,0.35)',
+            backdropFilter: 'blur(6px)',
+            display: 'grid',
+            placeItems: 'center',
+            zIndex: 60,
+          }}
+          onClick={() => setDeleteOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(520px, 92vw)',
+              background: '#fff',
+              border: '1px solid rgba(16,25,39,0.12)',
+              borderRadius: '14px',
+              boxShadow: '0 10px 30px rgba(16,25,39,0.2)',
+              padding: '18px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: '#fee2e2', display: 'grid', placeItems: 'center' }}>
+                <span style={{ color: '#b91c1c', fontWeight: 900 }}>!</span>
+              </div>
+              <div style={{ fontWeight: 800, fontSize: '1rem' }}>Delete this post?</div>
+            </div>
+            <div style={{ color: '#475569', fontSize: '0.95rem' }}>
+              This will permanently remove the post from the community. This action cannot be undone.
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '14px' }}>
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(false)}
+                style={{
+                  border: '1px solid rgba(16,25,39,0.12)',
+                  background: '#fff',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  color: '#111827',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteTarget && handleDeletePost(deleteTarget)}
+                style={{
+                  border: 'none',
+                  background: '#b91c1c',
+                  color: '#fff',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <footer
         style={{
           background: 'linear-gradient(135deg, #D81B60, #B8105B)',
           padding: '28px 0',
-          marginTop: '32px',
         }}
       >
         <div className="container-pro" style={{ textAlign: 'center', color: 'rgba(255,255,255,0.92)' }}>

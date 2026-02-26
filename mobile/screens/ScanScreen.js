@@ -389,8 +389,8 @@ export default function ScanScreen({ user }) {
             <Card.Title title="Detailed Analysis" />
             <Card.Content>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Approx. Weight:</Text>
-                <Text style={styles.detailValue}>{scanResult.weight_grams_est} g</Text>
+                <Text style={styles.detailLabel}>Approx. Size:</Text>
+                <Text style={styles.detailValue}>{scanResult.size_category}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Sorting Lane:</Text>
@@ -424,14 +424,6 @@ export default function ScanScreen({ user }) {
                 <Text style={styles.detailLabel}>Shape Quality:</Text>
                 <Text style={styles.detailValue}>{scanResult.shape_quality}</Text>
               </View>
-              {scanResult.color_analysis && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Color:</Text>
-                  <Text style={styles.detailValue}>
-                    R {scanResult.color_analysis.r} / G {scanResult.color_analysis.g} / B {scanResult.color_analysis.b}
-                  </Text>
-                </View>
-              )}
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Disease Status:</Text>
                 <Text style={[styles.detailValue, { color: scanResult.defect_level === 'high' ? 'red' : 'black' }]}>
@@ -487,20 +479,6 @@ export default function ScanScreen({ user }) {
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Size Category:</Text>
                 <Text style={styles.detailValue}>{scanResult.size_category || '--'}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Approx. Weight:</Text>
-                <Text style={styles.detailValue}>
-                  {typeof scanResult.weight_grams_est === 'number' ? `${scanResult.weight_grams_est} g` : '--'}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Color:</Text>
-                <Text style={styles.detailValue}>
-                  {scanResult.color_analysis
-                    ? `R ${scanResult.color_analysis.r} / G ${scanResult.color_analysis.g} / B ${scanResult.color_analysis.b}`
-                    : '--'}
-                </Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Harvest Stage:</Text>

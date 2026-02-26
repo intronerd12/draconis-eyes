@@ -17,6 +17,7 @@ import ChatbotScreen from './screens/ChatbotScreen';
 import GuideScreen from './screens/GuideScreen';
 import WeatherScreen from './screens/WeatherScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
+import NotificationsScreen from './screens/NotificationsScreen';
 import MappingEnvironmentScreen from './screens/MappingEnvironmentScreen';
 import CommunityForumScreen from './screens/CommunityForumScreen';
 
@@ -169,6 +170,7 @@ export default function App() {
             <Stack.Screen name="EditProfile">
               {props => <EditProfileScreen {...props} onUpdateUser={handleUpdateUser} />}
             </Stack.Screen>
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="CommunityForum">
               {props => <CommunityForumScreen {...props} user={user} />}
             </Stack.Screen>

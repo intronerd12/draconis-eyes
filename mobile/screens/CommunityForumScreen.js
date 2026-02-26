@@ -113,6 +113,8 @@ export default function CommunityForumScreen({ navigation, user }) {
   const [formError, setFormError] = useState('');
   const [feedError, setFeedError] = useState('');
   const [scanError, setScanError] = useState('');
+  const [deleteVisible, setDeleteVisible] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const selectedScan = useMemo(
     () => scans.find((scan) => String(scan?.id) === String(selectedScanId)) || null,
@@ -272,6 +274,30 @@ export default function CommunityForumScreen({ navigation, user }) {
     }
   };
 
+  const confirmDelete = (post) => {
+    setDeleteTarget(post);
+    setDeleteVisible(true);
+  };
+
+  const performDelete = async () => {
+    try {
+      const postId = String(deleteTarget?._id || deleteTarget?.id || '');
+      if (!postId) {
+        setDeleteVisible(false);
+        setDeleteTarget(null);
+        return;
+      }
+      await CommunityService.deletePost({ user, postId });
+      setPosts((prev) => prev.filter((p) => String(p?._id || p?.id) !== postId));
+      void loadData({ silent: true });
+    } catch (err) {
+      console.warn('[community] delete failed:', err?.message || err);
+    } finally {
+      setDeleteVisible(false);
+      setDeleteTarget(null);
+    }
+  };
+
   const renderPost = ({ item }) => {
     const scan = item?.scanSnapshot || null;
     const authorName = item?.authorName || item?.user?.name || 'Anonymous User';
@@ -296,6 +322,11 @@ export default function CommunityForumScreen({ navigation, user }) {
 
     const isHearted = myReaction?.type === 'heart';
     const isLiked = myReaction?.type === 'like';
+    const canDelete =
+      (userId && item?.user && String(item.user?._id || item.user) === String(userId)) ||
+      (userEmail && String(item?.authorEmail || '').toLowerCase() === String(userEmail));
+
+    const confirmDeleteLocal = () => confirmDelete(item);
 
     return (
       <Surface style={styles.postCard} elevation={2}>
@@ -309,6 +340,11 @@ export default function CommunityForumScreen({ navigation, user }) {
               {authorEmail ? `${authorEmail} | ` : ''}{formatDate(item?.createdAt || item?.timestamp)}
             </Text>
           </View>
+          {canDelete ? (
+            <TouchableOpacity onPress={confirmDeleteLocal} style={{ padding: 6 }} activeOpacity={0.8}>
+              <Ionicons name="trash-outline" size={18} color={THEME.danger} />
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {item?.text ? <Text style={styles.postText}>{item.text}</Text> : null}
@@ -443,6 +479,20 @@ export default function CommunityForumScreen({ navigation, user }) {
           </Dialog.Content>
           <Dialog.Actions>
             <Button textColor={THEME.textLight} onPress={() => setNotificationsVisible(false)}>Close</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+      <Portal>
+        <Dialog visible={deleteVisible} onDismiss={() => setDeleteVisible(false)} style={{ backgroundColor: '#fff' }}>
+          <Dialog.Title style={{ color: THEME.textDark }}>Delete this post?</Dialog.Title>
+          <Dialog.Content>
+            <Text style={{ color: THEME.textLight }}>
+              This will permanently remove the post from the community. This action cannot be undone.
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button textColor={THEME.textLight} onPress={() => setDeleteVisible(false)}>Cancel</Button>
+            <Button textColor={THEME.danger} onPress={performDelete}>Delete</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

@@ -73,6 +73,7 @@ const fetchJsonWithTimeout = async (url, timeoutMs = 4500) => {
 
 const Analytics = () => {
   const [analytics, setAnalytics] = useState(defaultAnalytics);
+  const [communityStats, setCommunityStats] = useState(null);
   const [weather, setWeather] = useState(null);
   const [serviceHealth, setServiceHealth] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -106,6 +107,16 @@ const Analytics = () => {
       .map((g) => ({ grade: g.grade, count: Number(g.count || 0) }))
       .sort((a, b) => b.count - a.count)[0];
     const topGradePct = totalGrades ? Math.round(((topGrade?.count || 0) / totalGrades) * 100) : 0;
+    
+    // Community stats
+    const commPosts = communityStats?.totalPosts || 0;
+    const commComments = communityStats?.totalComments || 0;
+    const commReactions = communityStats?.totalReactions || 0;
+    const commActive = communityStats?.activeUsers || 0;
+    const commInteractions = commComments + commReactions;
+    const commEngagementRate = commPosts ? (commInteractions / commPosts).toFixed(1) : '0.0';
+    const topAuthor = communityStats?.topAuthor?._id || 'None';
+
     let y = margin;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
@@ -124,6 +135,8 @@ const Analytics = () => {
     doc.text(`Total Scans: ${numberFmt.format(totals.scans || 0)}`, margin, y);
     y += 16;
     doc.text(`Users: ${numberFmt.format(totals.users || 0)} (${numberFmt.format(totals.activeUsers || 0)} active)`, margin, y);
+    y += 16;
+    doc.text(`Community: ${numberFmt.format(commPosts)} posts, ${numberFmt.format(commInteractions)} interactions`, margin, y);
     y += 16;
     doc.text(`Mobile vs Web: ${numberFmt.format(totals.mobileScans || 0)} vs ${numberFmt.format(totals.webScans || 0)} (${mobileShare}% / ${webShare}%)`, margin, y);
     y += 16;
@@ -145,6 +158,12 @@ const Analytics = () => {
     }
     doc.text(`• Source mix indicates ${mobileShare}% mobile and ${webShare}% web engagement.`, margin, y);
     y += 16;
+    doc.text(`• Community engagement averages ${commEngagementRate} interactions per post.`, margin, y);
+    y += 16;
+    if (topAuthor !== 'None') {
+        doc.text(`• Top contributor: ${topAuthor}.`, margin, y);
+        y += 16;
+    }
     if (weather) {
       const temp = weather?.temperature != null ? `${weather.temperature}°C` : 'N/A';
       const hum = weather?.humidity != null ? `${weather.humidity}%` : 'N/A';
@@ -166,8 +185,26 @@ const Analytics = () => {
       theme: 'striped',
     });
     const afterGradesY = doc.lastAutoTable.finalY + 20;
+    
+    // Community Table
     autoTable(doc, {
-      startY: afterGradesY,
+        startY: afterGradesY,
+        head: [['Community Metric', 'Value']],
+        body: [
+            ['Total Posts', numberFmt.format(commPosts)],
+            ['Total Comments', numberFmt.format(commComments)],
+            ['Total Reactions', numberFmt.format(commReactions)],
+            ['Active Contributors', numberFmt.format(commActive)],
+            ['Posts (Last 24h)', numberFmt.format(communityStats?.postsLast24h || 0)],
+        ],
+        styles: { fontSize: 11 },
+        headStyles: { fillColor: [190, 18, 60] }, // Reddish
+        theme: 'striped',
+    });
+    const afterCommunityY = doc.lastAutoTable.finalY + 20;
+
+    autoTable(doc, {
+      startY: afterCommunityY,
       head: [['Source', 'Count', 'Percent']],
       body: sources.map((s) => {
         const c = Number(s.count || 0);
@@ -201,12 +238,14 @@ const Analytics = () => {
 
     const requests = await Promise.allSettled([
       fetchJsonWithTimeout(`${API_BASE_URL}/api/scan/analytics`),
+      fetchJsonWithTimeout(`${API_BASE_URL}/api/community/analytics`),
       fetchJsonWithTimeout(`${API_BASE_URL}/api/weather?province=Metro%20Manila`, 5000),
       fetchJsonWithTimeout(`${API_BASE_URL}/status`, 5000),
     ]);
 
-    const [analyticsResult, weatherResult, serviceResult] = requests;
+    const [analyticsResult, communityResult, weatherResult, serviceResult] = requests;
     const hasAnalytics = analyticsResult.status === 'fulfilled';
+    const hasCommunity = communityResult.status === 'fulfilled';
     const hasWeather = weatherResult.status === 'fulfilled';
     const hasService = serviceResult.status === 'fulfilled';
 
@@ -218,9 +257,10 @@ const Analytics = () => {
       setAnalytics(analyticsResult.value || defaultAnalytics);
     }
 
+    if (hasCommunity) setCommunityStats(communityResult.value);
     if (hasWeather) setWeather(weatherResult.value);
     if (hasService) setServiceHealth(serviceResult.value);
-    if (hasAnalytics || hasWeather || hasService) setLastUpdated(new Date());
+    if (hasAnalytics || hasCommunity || hasWeather || hasService) setLastUpdated(new Date());
 
     setLoading(false);
     setRefreshing(false);
@@ -306,6 +346,36 @@ const Analytics = () => {
           }))
         : [],
     [weather]
+  );
+
+  const communityCards = useMemo(
+    () => [
+      {
+        label: 'Community Posts',
+        value: numberFmt.format(communityStats?.totalPosts || 0),
+        icon: <Users size={20} color="#fff" />,
+        color: '#be123c',
+      },
+      {
+        label: 'Comments',
+        value: numberFmt.format(communityStats?.totalComments || 0),
+        icon: <Activity size={20} color="#fff" />,
+        color: '#0369a1',
+      },
+      {
+        label: 'Reactions',
+        value: numberFmt.format(communityStats?.totalReactions || 0),
+        icon: <CloudSun size={20} color="#fff" />, // Using CloudSun as placeholder, maybe Heart if available but lucide-react might not have it imported
+        color: '#e11d48',
+      },
+      {
+        label: 'Active Users',
+        value: numberFmt.format(communityStats?.activeUsers || 0),
+        icon: <Users size={20} color="#fff" />,
+        color: '#15803d',
+      },
+    ],
+    [communityStats]
   );
 
   if (loading) {
@@ -412,6 +482,51 @@ const Analytics = () => {
             </div>
           </div>
         ))}
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: 12 }}>
+          Community Engagement
+        </h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14 }}>
+          {communityCards.map((card) => (
+            <div
+              key={card.label}
+              style={{
+                background: '#fff',
+                borderRadius: 12,
+                border: '1px solid #e5e7eb',
+                padding: 16,
+                boxShadow: '0 4px 14px rgba(15,23,42,0.05)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 12, letterSpacing: 0.4, textTransform: 'uppercase', color: '#6b7280', fontWeight: 700 }}>
+                  {card.label}
+                </div>
+                <div style={{ fontSize: 24, lineHeight: 1.1, fontWeight: 800, color: '#0f172a', marginTop: 4 }}>
+                  {card.value}
+                </div>
+              </div>
+              <div
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 12,
+                  display: 'grid',
+                  placeItems: 'center',
+                  background: card.color,
+                }}
+              >
+                {card.icon}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 18, marginBottom: 18 }}>

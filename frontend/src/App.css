@@ -1249,10 +1249,12 @@ nav {
 
 .auth-toggle-pro {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
+  gap: 8px;
   color: var(--gray-600);
   font-size: 14px;
+  margin-top: 24px;
 }
 
 .auth-toggle-pro button {
@@ -1295,6 +1297,98 @@ nav {
   padding: 32px;
   border: 1px solid var(--gray-200);
   box-shadow: var(--shadow-md);
+}
+
+/* Auth Buttons */
+.auth-btn-primary {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--dragon-primary) 0%, #ff4d9e 100%);
+  color: white;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(231, 29, 115, 0.25);
+  margin-top: 12px;
+}
+
+.auth-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(231, 29, 115, 0.35);
+}
+
+.auth-btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.auth-social-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.auth-btn-social {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  color: var(--gray-700);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.auth-btn-social:hover {
+  background: var(--gray-50);
+  border-color: var(--gray-400);
+  transform: translateY(-1px);
+}
+
+.auth-btn-social svg {
+  width: 20px;
+  height: 20px;
+}
+
+.auth-btn-google {
+  background-color: #DB4437;
+  color: white;
+  border: none;
+}
+
+.auth-btn-google:hover {
+  background-color: #c53929;
+  border-color: #c53929;
+  color: white;
+}
+
+.auth-btn-facebook {
+  background-color: #1877F2;
+  color: white;
+  border: none;
+}
+
+.auth-btn-facebook:hover {
+  background-color: #166fe5;
+  border-color: #166fe5;
+  color: white;
+}
+
+.auth-btn-facebook svg {
+  color: white !important;
 }
 
 .admin-card h3 {

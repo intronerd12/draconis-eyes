@@ -11,6 +11,7 @@ import '../App.css'
 function Home() {
   const navigate = useNavigate()
   const [health, setHealth] = useState('checking...')
+  const [user, setUser] = useState(null)
 
   useEffect(() => {
     const userStr = localStorage.getItem('user')
@@ -20,8 +21,12 @@ function Home() {
     }
 
     try {
-      const user = JSON.parse(userStr)
-      if (user.role === 'admin') navigate('/admin')
+      const userData = JSON.parse(userStr)
+      if (userData.role === 'admin') {
+        navigate('/admin')
+      } else {
+        setUser(userData)
+      }
     } catch {
       localStorage.removeItem('user')
       navigate('/login')
@@ -73,6 +78,25 @@ function Home() {
                 {health === 'healthy' ? 'ONLINE' : 'CONNECTING'}
               </span>
             </div>
+            {user && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid #e5e7eb', paddingLeft: '24px' }}>
+                <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: '600', color: '#111827' }}>{user.name || 'User'}</span>
+                  <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{user.email}</span>
+                </div>
+                {user.avatar ? (
+                  <img 
+                    src={user.avatar} 
+                    alt={user.name} 
+                    style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
+                  />
+                ) : (
+                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e5e7eb' }}>
+                    <span style={{ fontSize: '1.2rem' }}>👤</span>
+                  </div>
+                )}
+              </div>
+            )}
             <button
               onClick={handleLogout}
               className="btn-outline"

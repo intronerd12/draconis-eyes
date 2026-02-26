@@ -161,6 +161,21 @@ export const verifyEmail = async (email, code) => {
   }
 };
 
+export const socialLogin = async (payload) => {
+  try {
+    const response = await apiFetch('/api/auth/social-login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
 export const updateUser = async (userId, userData) => {
   try {
     const response = await apiFetch(`/api/users/${userId}`, {

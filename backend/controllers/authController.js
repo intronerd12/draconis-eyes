@@ -25,8 +25,14 @@ const registerUser = async (req, res) => {
     // Check if user exists
     const userExists = await User.findOne({ email });
 
-    if (userExists && userExists.is_email_verified) {
+    if (userExists && userExists.is_email_verified && userExists.password) {
       return res.status(400).json({ message: 'User already exists' });
+    }
+
+    if (userExists && !userExists.password && (userExists.googleId || userExists.facebookId)) {
+        // Allow linking password to social account if needed, but for now just error or handle differently
+        // For register flow, if they exist as social user, maybe just tell them to login with social?
+        return res.status(400).json({ message: 'User already exists with social login. Please login with Google/Facebook.' });
     }
 
     // Generate verification token
@@ -38,20 +44,22 @@ const registerUser = async (req, res) => {
     if (userExists && !userExists.is_email_verified) {
       // Update existing unverified user
       userExists.name = name;
-      userExists.password = password; // Pre-save hook will hash this
+      if (password) userExists.password = password; // Only set password if provided
       userExists.verificationCode = verificationCode;
       userExists.verificationCodeExpires = verificationCodeExpires;
       
       user = await userExists.save();
     } else {
       // Create new user
-      user = await User.create({
+      const userData = {
         name,
         email,
-        password, // Pre-save hook will hash this
         verificationCode,
         verificationCodeExpires
-      });
+      };
+      if (password) userData.password = password; // Only set password if provided
+      
+      user = await User.create(userData);
     }
 
     if (user) {
@@ -183,9 +191,74 @@ const getMe = async (req, res) => {
   res.status(200).json(req.user);
 };
 
+// @desc    Social Login (Google/Facebook)
+// @route   POST /api/auth/social-login
+// @access  Public
+const socialLogin = async (req, res) => {
+  const { name, email, googleId, facebookId, avatar } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: 'Email is required for social login' });
+  }
+
+  try {
+    let user = await User.findOne({ email });
+
+    if (user) {
+      // Update existing user with social ID if missing
+      if (googleId && !user.googleId) user.googleId = googleId;
+      if (facebookId && !user.facebookId) user.facebookId = facebookId;
+      if (avatar && !user.avatar) user.avatar = avatar;
+      
+      // If user was unverified but now logging in via social (trusted), mark verified
+      if (!user.is_email_verified) {
+          user.is_email_verified = true;
+          user.verificationCode = undefined;
+          user.verificationCodeExpires = undefined;
+      }
+
+      await user.save();
+    } else {
+      // Create new user
+      user = await User.create({
+        name: name || email.split('@')[0],
+        email,
+        googleId,
+        facebookId,
+        avatar: avatar || '',
+        is_email_verified: true, // Trusted from Google/Facebook
+      });
+    }
+
+    if (user.status === 'banned') {
+      return res.status(403).json({ message: `Account banned: ${user.status_reason || 'Violation of terms'}` });
+    }
+
+    user.last_login_at = new Date();
+    await user.save();
+
+    res.status(200).json({
+      _id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar,
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    console.error('Social Login Error:', error);
+    if (error.code === 11000) {
+      // Duplicate key error (likely email or social ID collision)
+      return res.status(400).json({ message: 'User with this email already exists but is not linked to this social account.' });
+    }
+    res.status(500).json({ message: 'Server error during social login' });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   getMe,
   verifyEmail,
+  socialLogin,
 };

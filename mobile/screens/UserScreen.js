@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Linking } from 'react-native';
 import { Text, Avatar, Surface, Button, Title, Paragraph, Dialog, Portal } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +25,7 @@ const THEME = {
 export default function UserScreen({ navigation, user, onLogout, onUpdateUser }) {
   const insets = useSafeAreaInsets();
   const [logoutVisible, setLogoutVisible] = React.useState(false);
+  const [contactVisible, setContactVisible] = React.useState(false);
 
   const handleLogoutPress = () => {
     setLogoutVisible(true);
@@ -137,23 +138,23 @@ export default function UserScreen({ navigation, user, onLogout, onUpdateUser })
               icon="notifications-outline" 
               title="Notifications" 
               subtitle="Manage your alerts"
-            />
-            <MenuItem 
-              icon="shield-checkmark-outline" 
-              title="Privacy & Security" 
-              subtitle="Password, 2FA"
+              onPress={() => navigation.navigate('Notifications')}
             />
           </Surface>
 
           <Surface style={styles.section} elevation={1}>
             <Text style={styles.sectionHeader}>Support</Text>
             <MenuItem 
-              icon="help-circle-outline" 
-              title="Help Center" 
+              icon="chatbubbles-outline" 
+              title="Chatbot Assistant" 
+              subtitle="Get help from our AI"
+              onPress={() => navigation.navigate('Chatbot')}
             />
             <MenuItem 
               icon="mail-outline" 
-              title="Contact Us" 
+              title="Contact Support" 
+              subtitle="Email & Social Media"
+              onPress={() => setContactVisible(true)}
             />
           </Surface>
 
@@ -167,6 +168,39 @@ export default function UserScreen({ navigation, user, onLogout, onUpdateUser })
           <Text style={styles.versionText}>Version 1.0.0</Text>
         </View>
       </ScrollView>
+
+      {/* Contact Dialog */}
+      <Portal>
+        <Dialog visible={contactVisible} onDismiss={() => setContactVisible(false)} style={{ backgroundColor: THEME.white }}>
+          <Dialog.Title style={{ textAlign: 'center', color: THEME.primaryDark }}>Contact Support</Dialog.Title>
+          <Dialog.Content>
+            <TouchableOpacity 
+              style={styles.contactOption}
+              onPress={() => {
+                setContactVisible(false);
+                Linking.openURL('https://facebook.com/tropiscan');
+              }}
+            >
+              <Ionicons name="logo-facebook" size={24} color="#1877F2" />
+              <Text style={styles.contactText}>Facebook</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.contactOption}
+              onPress={() => {
+                setContactVisible(false);
+                Linking.openURL('mailto:support@tropiscan.com');
+              }}
+            >
+              <Ionicons name="mail" size={24} color="#DB4437" />
+              <Text style={styles.contactText}>Gmail / Email</Text>
+            </TouchableOpacity>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setContactVisible(false)} textColor={THEME.textLight}>Close</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
 
       {/* Logout Dialog */}
       <Portal>
@@ -334,5 +368,17 @@ const styles = StyleSheet.create({
     marginTop: 30,
     color: THEME.textLight,
     fontSize: 12,
+  },
+  contactOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  contactText: {
+    fontSize: 16,
+    marginLeft: 16,
+    color: THEME.textDark,
   },
 });

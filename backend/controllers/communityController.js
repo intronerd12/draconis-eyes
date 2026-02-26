@@ -175,6 +175,11 @@ const getCommunityPosts = async (req, res) => {
     const rawLimit = Number(req.query?.limit || 50);
     const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(rawLimit, 120)) : 50;
 
+    // Prevent caching of community posts
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     const posts = await CommunityPost.find()
       .sort({ createdAt: -1 })
       .limit(limit)
@@ -544,6 +549,131 @@ const toggleCommunityReaction = async (req, res) => {
   }
 };
 
+const deleteCommunityPost = async (req, res) => {
+  try {
+    let { postId } = req.params;
+    postId = String(postId || '').trim();
+
+    if (!postId || !mongoose.Types.ObjectId.isValid(postId)) {
+      return res.status(400).json({ message: 'Valid postId is required' });
+    }
+    const post = await CommunityPost.findById(postId);
+    if (!post) {
+      console.log(`[Community] Delete failed: Post ${postId} not found`);
+      return res.status(404).json({ message: 'Community post not found' });
+    }
+    
+    const userId = req.body?.userId || req.query?.userId || req.headers?.['x-user-id'];
+    const authorEmail =
+      req.body?.authorEmail ||
+      req.query?.authorEmail ||
+      req.body?.email ||
+      req.query?.email ||
+      req.headers?.['x-user-email'];
+      
+    console.log(`[Community] Attempting delete for post ${postId} (DB ID: ${post._id}) by user ${userId} / ${authorEmail}`);
+
+    const resolvedUser = await resolveUser({ userId, authorEmail });
+    const actorUserId = resolvedUser?._id ? String(resolvedUser._id) : (mongoose.Types.ObjectId.isValid(String(userId || '')) ? String(userId) : null);
+    const actorEmail = normalizeText(authorEmail)?.toLowerCase() || resolvedUser?.email || null;
+    let ownerMatch = false;
+    
+    // Check if actor is the post owner (registered user match)
+    if (actorUserId && post.user && String(post.user) === actorUserId) {
+      ownerMatch = true;
+    } else {
+      // Check email match
+      const emailCandidates = [];
+      if (post.authorEmail) emailCandidates.push(String(post.authorEmail).toLowerCase());
+      if (post.user && !post.authorEmail) {
+        try {
+          const postUser = await User.findById(post.user).select('email');
+          if (postUser?.email) emailCandidates.push(String(postUser.email).toLowerCase());
+        } catch {}
+      }
+      if (actorEmail && emailCandidates.includes(String(actorEmail).toLowerCase())) {
+        ownerMatch = true;
+      }
+    }
+    
+    if (!ownerMatch) {
+      console.log(`[Community] Delete denied for post ${postId}. Owner: ${post.user || post.authorEmail}, Actor: ${actorUserId || actorEmail}`);
+      return res.status(403).json({ message: 'You can only delete your own post' });
+    }
+
+    // Use findOneAndDelete to get the deleted document and ensure atomicity
+    const deletedPost = await CommunityPost.findOneAndDelete({ _id: post._id });
+
+    if (!deletedPost) {
+        console.warn(`[Community] Post ${postId} deletion failed (not found during delete)`);
+        // Check if it still exists (race condition?)
+        const exists = await CommunityPost.exists({ _id: post._id });
+        if (exists) {
+            return res.status(500).json({ message: 'Failed to delete post from database' });
+        }
+        // If it doesn't exist, it was already deleted, which is fine
+        return res.status(200).json({ message: 'Post already deleted', id: String(post._id) });
+    }
+
+    console.log(`[Community] Post ${postId} permanently deleted.`);
+
+    return res.status(200).json({ message: 'Post deleted', id: String(post._id) });
+  } catch (error) {
+    console.error(`[Community] Delete error for ${req.params?.postId}:`, error);
+    return res.status(500).json({ message: error.message || 'Failed to delete community post' });
+  }
+};
+
+// @desc    Get community analytics
+// @route   GET /api/community/analytics
+// @access  Public (Admin)
+const getCommunityAnalytics = async (req, res) => {
+  try {
+    const totalPosts = await CommunityPost.countDocuments();
+    
+    // Aggregation for comments and reactions
+    const stats = await CommunityPost.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalComments: { $sum: { $size: "$comments" } },
+          totalReactions: { $sum: { $size: "$reactions" } },
+        }
+      }
+    ]);
+
+    const totalComments = stats[0]?.totalComments || 0;
+    const totalReactions = stats[0]?.totalReactions || 0;
+
+    // Active users count (unique authors)
+    const distinctAuthors = await CommunityPost.distinct('authorEmail');
+    const activeUsers = distinctAuthors.length;
+
+    // Posts in last 24h
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const postsLast24h = await CommunityPost.countDocuments({ createdAt: { $gte: oneDayAgo } });
+
+    // Most active author
+    const topAuthor = await CommunityPost.aggregate([
+      { $group: { _id: "$authorName", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 1 }
+    ]);
+
+    res.status(200).json({
+      totalPosts,
+      totalComments,
+      totalReactions,
+      activeUsers,
+      postsLast24h,
+      topAuthor: topAuthor[0] || { _id: 'None', count: 0 }
+    });
+  } catch (error) {
+    console.error('Community analytics error:', error);
+    res.status(500).json({ message: 'Failed to fetch community analytics' });
+  }
+};
+
 module.exports = {
   getCommunityPosts,
   createCommunityPost,
@@ -552,4 +682,6 @@ module.exports = {
   getCommunityNotifications,
   toggleCommunityReaction,
   markCommunityNotificationsRead,
+  deleteCommunityPost,
+  getCommunityAnalytics,
 };

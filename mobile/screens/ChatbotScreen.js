@@ -98,9 +98,9 @@ export default function ChatbotScreen({ navigation, user }) {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const keyboardOffset = Platform.OS === 'android' ? Math.max(keyboardHeight - insets.bottom, 0) : 0;
-  const composerBottomOffset = keyboardOffset > 0 ? keyboardOffset + 8 : inputBottomOffset;
-  const listBottomPadding = keyboardOffset > 0 ? keyboardOffset + 120 : Math.max(tabBarHeight + 96, 150);
+  const keyboardOffset = 0;
+  const composerBottomOffset = (Platform.OS === 'android' && keyboardHeight > 0) ? 12 : inputBottomOffset;
+  const listBottomPadding = Math.max(tabBarHeight + 96, 150);
 
   useEffect(() => {
     (async () => {
@@ -247,6 +247,31 @@ export default function ChatbotScreen({ navigation, user }) {
     );
   };
   
+  const parseFormattedText = (text) => {
+    const parts = [];
+    const boldRegex = /\*\*(.*?)\*\*/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = boldRegex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push({ text: text.substring(lastIndex, match.index), bold: false });
+      }
+      parts.push({ text: match[1], bold: true });
+      lastIndex = boldRegex.lastIndex;
+    }
+    if (lastIndex < text.length) {
+      parts.push({ text: text.substring(lastIndex), bold: false });
+    }
+    
+    if (parts.length === 0) return [{ text: text, bold: false }];
+
+    return parts.map(p => ({
+        ...p,
+        text: p.text.replace(/\*/g, '')
+    }));
+  };
+
   const MessageText = ({ text, isUser }) => {
     const t = String(text || '');
     if (isUser) {
@@ -256,22 +281,49 @@ export default function ChatbotScreen({ navigation, user }) {
     return (
       <View style={styles.msgTextWrap}>
         {lines.map((line, idx) => {
-          const trimmed = String(line || '').trim();
+          let trimmed = String(line || '').trim();
           if (!trimmed) return <View key={`br-${idx}`} style={{ height: 4 }} />;
-          const isBullet = trimmed.startsWith('• ');
-          if (idx === 0 && !isBullet) {
-            return <Text key={`ttl-${idx}`} style={styles.msgTitle}>{trimmed}</Text>;
+
+          let isBullet = false;
+          if (/^[\*•-]\s+/.test(trimmed)) {
+            isBullet = true;
+            trimmed = trimmed.replace(/^[\*•-]\s+/, '');
           }
+
+          const parts = parseFormattedText(trimmed);
+
+          const renderContent = () => (
+             <Text style={styles.msgLine}>
+                {parts.map((p, i) => (
+                  <Text key={i} style={p.bold ? { fontWeight: '800' } : {}}>
+                    {p.text}
+                  </Text>
+                ))}
+             </Text>
+          );
+
+          if (idx === 0 && !isBullet) {
+             return (
+               <Text key={`ttl-${idx}`} style={styles.msgTitle}>
+                 {parts.map(p => p.text).join('')}
+               </Text>
+             );
+          }
+
           if (isBullet) {
-            const content = trimmed.replace(/^•\s*/, '');
             return (
               <View key={`row-${idx}`} style={styles.msgRow}>
                 <View style={styles.msgDot} />
-                <Text style={styles.msgLine}>{content}</Text>
+                {renderContent()}
               </View>
             );
           }
-          return <Text key={`ln-${idx}`} style={styles.msgLine}>{trimmed}</Text>;
+          
+          return (
+             <View key={`ln-${idx}`}>
+               {renderContent()}
+             </View>
+          );
         })}
       </View>
     );
@@ -371,6 +423,7 @@ export default function ChatbotScreen({ navigation, user }) {
       <FlatList
         ref={listRef}
         data={messages}
+        style={{ flex: 1 }}
         keyExtractor={(m) => m.id}
         renderItem={renderMessage}
         contentContainerStyle={[styles.listContent, { paddingBottom: listBottomPadding }]}

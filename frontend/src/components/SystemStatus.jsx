@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_BASE_URL } from '../config/api'
 
 function SystemStatus() {
   const [status, setStatus] = useState({
@@ -10,10 +11,14 @@ function SystemStatus() {
   useEffect(() => {
     const checkStatus = async () => {
       try {
-        const res = await fetch('http://localhost:5000/status')
+        const res = await fetch(`${API_BASE_URL}/status`)
         if (res.ok) {
           const data = await res.json()
-          setStatus(data)
+          setStatus({
+            mongodb: data.database || 'offline',
+            cloudinary: data.cloudinary || 'offline',
+            ai_service: data.ai_service || 'offline'
+          })
         } else {
           setStatus({
             mongodb: 'error',

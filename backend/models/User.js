@@ -18,7 +18,17 @@ const userSchema = mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, 'Please add a password'],
+      required: false, // Changed to false for social login users
+    },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    facebookId: {
+      type: String,
+      unique: true,
+      sparse: true,
     },
     role: {
       type: String,
@@ -59,8 +69,9 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 };
 
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) {
+  if (!this.isModified('password') || !this.password) {
     next();
+    return;
   }
 
   const salt = await bcrypt.genSalt(10);

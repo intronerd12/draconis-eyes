@@ -18,15 +18,16 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loginUser, registerUser, verifyEmail } from '../services/api';
 
+
 const { width, height } = Dimensions.get('window');
 
 // Consistent Theme Palette
 const THEME = {
-  primary: '#C71585', // Deep Pink
-  primaryDark: '#8B008B', // Dark Magenta
-  primaryLight: '#FF69B4', // Hot Pink
-  secondary: '#FFC0CB', // Pink
-  accent: '#00FA9A', // Medium Spring Green
+  primary: '#E71D73', // Dragon Primary
+  primaryDark: '#B00E53',
+  primaryLight: '#FF4D9E',
+  secondary: '#FFC0CB',
+  accent: '#23B28A', // Dragon Secondary
   white: '#FFFFFF',
   textDark: '#2D3436',
   textLight: '#636E72',
@@ -55,6 +56,8 @@ export default function AuthScreen({ onLogin }) {
   // Verification State
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
+
+
 
   const validateForm = () => {
     if (!isLogin && !name.trim()) {
@@ -423,6 +426,7 @@ export default function AuthScreen({ onLogin }) {
                     <Text style={styles.dividerText}>OR</Text>
                     <View style={styles.divider} />
                   </View>
+
 
                   <TouchableOpacity 
                     onPress={() => {

@@ -145,7 +145,7 @@ function Landing() {
   const [activeVideoSlide, setActiveVideoSlide] = useState(0)
   const [isPlaying, setIsPlaying] = useState(true)
   const videoRefs = useRef([])
-  const wallpapers = useMemo(() => getRandomWallpaperSet(6), [])
+  const wallpapers = useMemo(() => getRandomWallpaperSet(2), [])
 
   // Auto-advance video slider when playing
   useEffect(() => {
@@ -354,7 +354,7 @@ function Landing() {
 
         <section
           className="lp-section df-parallax-surface df-parallax-light"
-          style={{ '--df-bg-image': `url(${wallpapers[2].src})` }}
+          style={{ backgroundColor: '#f8fafc' }}
         >
           <div className="container-pro">
             <div className="lp-section-head">
@@ -383,7 +383,7 @@ function Landing() {
         <section
           id="workflow"
           className="lp-section lp-section-alt df-parallax-surface df-parallax-dark"
-          style={{ '--df-bg-image': `url(${wallpapers[3].src})`, color: '#fff' }}
+          style={{ backgroundColor: '#101927', color: '#fff' }}
         >
           <div className="container-pro">
             <div className="lp-section-head">
@@ -413,7 +413,7 @@ function Landing() {
         <section
           id="modules"
           className="lp-section df-parallax-surface df-parallax-light"
-          style={{ '--df-bg-image': `url(${wallpapers[4].src})` }}
+          style={{ backgroundColor: '#f8fafc' }}
         >
           <div className="container-pro">
             <div className="lp-section-head">
@@ -438,13 +438,13 @@ function Landing() {
 
         <section
           className="lp-cta-band df-parallax-surface df-parallax-dark"
-          style={{ '--df-bg-image': `url(${wallpapers[5].src})`, color: '#fff' }}
+          style={{ backgroundColor: '#fff', color: '#0f1728' }}
         >
           <div className="container-pro lp-cta-content">
             <div>
-              <span className="lp-kicker" style={{ color: 'rgba(255, 255, 255, 0.9)' }}>Ready to deploy?</span>
-              <h2 style={{ color: '#fff' }}>Give your grading process a professional standard.</h2>
-              <p style={{ color: 'rgba(255, 255, 255, 0.95)' }}>Sign in to start scanning, benchmarking, and improving every batch.</p>
+              <span className="lp-kicker" style={{ color: '#D81B60' }}>Ready to deploy?</span>
+              <h2 style={{ color: '#0f1728' }}>Give your grading process a professional standard.</h2>
+              <p style={{ color: '#4f5d73' }}>Sign in to start scanning, benchmarking, and improving every batch.</p>
             </div>
             <Link to="/login" className="lp-btn-primary">
               Go to login

@@ -9,7 +9,13 @@ const {
   getCommunityNotifications,
   markCommunityNotificationsRead,
   toggleCommunityReaction,
+  deleteCommunityPost,
+  getCommunityAnalytics,
 } = require('../controllers/communityController');
+
+// @desc    Get community analytics
+// @route   GET /api/community/analytics
+router.get('/analytics', getCommunityAnalytics);
 
 // @desc    Get community notifications
 // @route   GET /api/community/notifications
@@ -38,5 +44,8 @@ router.post('/:postId/comments', addCommunityComment);
 // @desc    Toggle reaction (heart/like)
 // @route   POST /api/community/:postId/reactions
 router.post('/:postId/reactions', toggleCommunityReaction);
+
+router.delete('/:postId', deleteCommunityPost);
+router.post('/:postId/delete', deleteCommunityPost);
 
 module.exports = router;

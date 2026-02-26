@@ -170,13 +170,13 @@ def _upgrade_grade_floor(grade: str, floor_grade: str) -> str:
 
 def _grade_from_index(score: float) -> str:
     s = float(np.clip(score, 0.0, 100.0))
-    if s >= 82:
+    if s >= 78:
         return "A"
-    if s >= 68:
+    if s >= 60:
         return "B"
-    if s >= 54:
+    if s >= 45:
         return "C"
-    if s >= 40:
+    if s >= 30:
         return "D"
     return "E"
 
@@ -184,9 +184,9 @@ def _grade_from_index(score: float) -> str:
 def _grade_from_index_abc(score: float) -> str:
     # Production-facing grading band focused on market-usable categories.
     s = float(np.clip(score, 0.0, 100.0))
-    if s >= 78:
+    if s >= 75:
         return "A"
-    if s >= 60:
+    if s >= 55:
         return "B"
     return "C"
 
@@ -196,9 +196,9 @@ def _grade_from_area_ratio(fruit_area_ratio: float) -> str:
     ratio = float(np.clip(float(fruit_area_ratio), 0.0, 1.0))
     if ratio <= 0.0:
         return "N/A"
-    if ratio < 0.12:
+    if ratio < 0.08:
         return "C"
-    if ratio < 0.26:
+    if ratio < 0.18:
         return "B"
     return "A"
 
@@ -281,8 +281,8 @@ def _load_scoring_calibration() -> dict:
         "defect_high_gate": 60.0,
         "fresh_quality_floor": 82.0,
         "fresh_defect_cap": 35.0,
-        "grade_floor_c_quality": 80.0,
-        "grade_floor_b_quality": 88.0,
+        "grade_floor_c_quality": 70.0,
+        "grade_floor_b_quality": 80.0,
     }
 
     try:
@@ -315,8 +315,8 @@ def _load_scoring_calibration() -> dict:
         defect_high_gate = float(np.clip(max(56.0, p90_defect + 16.0), 56.0, 72.0))
         fresh_quality_floor = float(np.clip(p25_quality - 2.0, 78.0, 85.0))
         fresh_defect_cap = float(np.clip(defect_medium_gate - 9.0, 24.0, 34.0))
-        grade_floor_c_quality = float(np.clip(p25_quality - 1.0, 76.0, 84.0))
-        grade_floor_b_quality = float(np.clip(p50_quality - 2.0, 82.0, 92.0))
+        grade_floor_c_quality = float(np.clip(p25_quality - 1.0, 70.0, 80.0))
+        grade_floor_b_quality = float(np.clip(p50_quality - 2.0, 78.0, 88.0))
 
         return {
             "defect_medium_gate": defect_medium_gate,
@@ -1257,9 +1257,9 @@ async def detect_quality(
         if yolo_bad_best_conf < 0.45:
             defect_probability = min(defect_probability, 36.0)
         
-        if fruit_area_ratio < 0.12:
+        if fruit_area_ratio < 0.08:
             size_category = "Small"
-        elif fruit_area_ratio < 0.26:
+        elif fruit_area_ratio < 0.18:
             size_category = "Medium"
         else:
             size_category = "Large"
