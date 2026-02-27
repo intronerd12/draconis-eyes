@@ -96,6 +96,31 @@ const getGradeTone = (grade) => {
   return { bg: '#E5E7EB', text: '#374151' };
 };
 
+const UserAvatar = ({ url, name, size = 34 }) => {
+  const initial = name ? name.charAt(0).toUpperCase() : '?';
+  return (
+    <View style={{
+      width: size,
+      height: size,
+      borderRadius: size / 2,
+      backgroundColor: '#e2e8f0',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(16,25,39,0.1)',
+      overflow: 'hidden',
+    }}>
+      {url ? (
+        <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} />
+      ) : (
+        <Text style={{ color: '#475569', fontWeight: 'bold', fontSize: size * 0.45 }}>
+          {initial}
+        </Text>
+      )}
+    </View>
+  );
+};
+
 export default function CommunityForumScreen({ navigation, user }) {
   const insets = useSafeAreaInsets();
   const [posts, setPosts] = useState([]);
@@ -115,6 +140,10 @@ export default function CommunityForumScreen({ navigation, user }) {
   const [scanError, setScanError] = useState('');
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const [reactorsVisible, setReactorsVisible] = useState(false);
+  const [currentReactors, setCurrentReactors] = useState([]);
+  const [reactionType, setReactionType] = useState('');
 
   const selectedScan = useMemo(
     () => scans.find((scan) => String(scan?.id) === String(selectedScanId)) || null,
@@ -298,6 +327,14 @@ export default function CommunityForumScreen({ navigation, user }) {
     }
   };
 
+  const showReactors = (reactors, type) => {
+    const filtered = reactors.filter((r) => r.type === type);
+    if (!filtered || filtered.length === 0) return;
+    setCurrentReactors(filtered);
+    setReactionType(type);
+    setReactorsVisible(true);
+  };
+
   const renderPost = ({ item }) => {
     const scan = item?.scanSnapshot || null;
     const authorName = item?.authorName || item?.user?.name || 'Anonymous User';
@@ -331,13 +368,11 @@ export default function CommunityForumScreen({ navigation, user }) {
     return (
       <Surface style={styles.postCard} elevation={2}>
         <View style={styles.postHead}>
-          <View style={styles.postAvatar}>
-            <Ionicons name="person" size={14} color="#fff" />
-          </View>
+          <UserAvatar url={item?.user?.avatar} name={authorName} size={40} />
           <View style={{ flex: 1 }}>
             <Text style={styles.postAuthor}>{authorName}</Text>
             <Text style={styles.postMeta}>
-              {authorEmail ? `${authorEmail} | ` : ''}{formatDate(item?.createdAt || item?.timestamp)}
+              {formatDate(item?.createdAt || item?.timestamp)}
             </Text>
           </View>
           {canDelete ? (
@@ -375,6 +410,7 @@ export default function CommunityForumScreen({ navigation, user }) {
           <TouchableOpacity
             style={[styles.reactionBtn, isHearted && styles.reactionActive]}
             onPress={() => handleReaction(item, 'heart')}
+            onLongPress={() => showReactors(reactions, 'heart')}
             activeOpacity={0.7}
           >
             <Ionicons name={isHearted ? 'heart' : 'heart-outline'} size={20} color={isHearted ? '#e11d48' : '#64748b'} />
@@ -386,6 +422,7 @@ export default function CommunityForumScreen({ navigation, user }) {
           <TouchableOpacity
             style={[styles.reactionBtn, isLiked && styles.reactionActive]}
             onPress={() => handleReaction(item, 'like')}
+            onLongPress={() => showReactors(reactions, 'like')}
             activeOpacity={0.7}
           >
             <Ionicons name={isLiked ? 'thumbs-up' : 'thumbs-up-outline'} size={20} color={isLiked ? '#2563eb' : '#64748b'} />
@@ -400,10 +437,13 @@ export default function CommunityForumScreen({ navigation, user }) {
           {comments.length ? (
             comments.slice(-3).map((comment) => (
               <View key={String(comment?._id || `${comment?.createdAt}-${comment?.text}`)} style={styles.commentItem}>
-                <Text style={styles.commentAuthor}>
-                  {comment?.commenterName || 'User'} | {formatDate(comment?.createdAt)}
-                </Text>
-                <Text style={styles.commentText}>{comment?.text || ''}</Text>
+                <UserAvatar url={comment?.commenterUser?.avatar} name={comment?.commenterName} size={28} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.commentAuthor}>
+                    {comment?.commenterName || 'User'} <Text style={{ fontWeight: '400', fontSize: 10 }}>• {formatDate(comment?.createdAt)}</Text>
+                  </Text>
+                  <Text style={styles.commentText}>{comment?.text || ''}</Text>
+                </View>
               </View>
             ))
           ) : (
@@ -467,9 +507,12 @@ export default function CommunityForumScreen({ navigation, user }) {
             <ScrollView style={{ maxHeight: 320 }} contentContainerStyle={{ gap: 10 }}>
               {notifications.length ? (
                 notifications.map((item) => (
-                  <View key={String(item?._id || item?.id || `${item?.createdAt}-${item?.message}`)} style={styles.notifItem}>
-                    <Text style={styles.notifMessage}>{item?.message || 'Community update'}</Text>
-                    <Text style={styles.notifMeta}>{formatDate(item?.createdAt)}</Text>
+                  <View key={String(item?._id || item?.id || `${item?.createdAt}-${item?.message}`)} style={[styles.notifItem, { flexDirection: 'row', gap: 10, alignItems: 'flex-start' }]}>
+                    <UserAvatar url={item?.actorUser?.avatar} name={item?.actorUser?.name || 'System'} size={32} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.notifMessage}>{item?.message || 'Community update'}</Text>
+                      <Text style={styles.notifMeta}>{formatDate(item?.createdAt)}</Text>
+                    </View>
                   </View>
                 ))
               ) : (
@@ -479,6 +522,31 @@ export default function CommunityForumScreen({ navigation, user }) {
           </Dialog.Content>
           <Dialog.Actions>
             <Button textColor={THEME.textLight} onPress={() => setNotificationsVisible(false)}>Close</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      <Portal>
+        <Dialog visible={reactorsVisible} onDismiss={() => setReactorsVisible(false)} style={styles.notifDialog}>
+          <Dialog.Title style={styles.notifTitle}>
+            Reacted with {reactionType === 'heart' ? '❤️' : '👍'}
+          </Dialog.Title>
+          <Dialog.Content>
+            <ScrollView style={{ maxHeight: 320 }} contentContainerStyle={{ gap: 10 }}>
+              {currentReactors.length ? (
+                currentReactors.map((r, i) => (
+                  <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <UserAvatar url={r.user?.avatar} name={r.name} size={32} />
+                    <Text style={{ color: THEME.textDark, fontWeight: '600' }}>{r.name}</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.notifEmpty}>No reactions yet.</Text>
+              )}
+            </ScrollView>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button textColor={THEME.textLight} onPress={() => setReactorsVisible(false)}>Close</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -1016,14 +1084,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15,23,42,0.04)',
     paddingHorizontal: 9,
     paddingVertical: 8,
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-start',
   },
   commentAuthor: {
-    color: THEME.textLight,
-    fontSize: 11,
+    color: THEME.textDark,
+    fontSize: 12,
     fontWeight: '700',
   },
   commentText: {
-    color: THEME.textDark,
+    color: THEME.textMid,
     fontSize: 12,
     marginTop: 2,
     lineHeight: 16,

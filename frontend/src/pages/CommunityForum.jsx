@@ -54,6 +54,120 @@ const hasDragonContext = (text, scan) => {
   return hasDragon && !hasNonDragon
 }
 
+const UserAvatar = ({ url, name, size = 32 }) => {
+  const initial = name ? name.charAt(0).toUpperCase() : '?'
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        backgroundColor: '#e2e8f0',
+        backgroundImage: url ? `url(${url})` : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#475569',
+        fontWeight: 'bold',
+        fontSize: size * 0.45,
+        flexShrink: 0,
+        border: '1px solid rgba(16,25,39,0.1)',
+      }}
+    >
+      {!url && initial}
+    </div>
+  )
+}
+
+const ReactionButton = ({ type, count, isActive, reactors, onClick }) => {
+  const [hover, setHover] = useState(false)
+  
+  return (
+    <div 
+      style={{ position: 'relative' }} 
+      onMouseEnter={() => setHover(true)} 
+      onMouseLeave={() => setHover(false)}
+    >
+      {hover && reactors.length > 0 && (
+        <div style={{
+          position: 'absolute',
+          bottom: '100%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          marginBottom: '8px',
+          background: 'white',
+          border: '1px solid #e2e8f0',
+          borderRadius: '12px',
+          padding: '12px',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+          zIndex: 50,
+          minWidth: '180px',
+          pointerEvents: 'none'
+        }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, marginBottom: '8px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Reacted by
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {reactors.slice(0, 5).map((r, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <UserAvatar url={r.user?.avatar} name={r.name} size={24} />
+                <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>
+                  {r.name}
+                </span>
+              </div>
+            ))}
+          </div>
+          {reactors.length > 5 && (
+            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '6px', textAlign: 'center', fontWeight: 500 }}>
+              + {reactors.length - 5} others
+            </div>
+          )}
+          {/* Arrow */}
+          <div style={{
+            position: 'absolute',
+            bottom: '-6px',
+            left: '50%',
+            transform: 'translateX(-50%) rotate(45deg)',
+            width: '12px',
+            height: '12px',
+            background: 'white',
+            borderRight: '1px solid #e2e8f0',
+            borderBottom: '1px solid #e2e8f0',
+          }} />
+        </div>
+      )}
+      
+      <button
+        type="button"
+        onClick={onClick}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          color: isActive ? (type === 'heart' ? '#e11d48' : '#2563eb') : '#64748b',
+          fontWeight: 600,
+          padding: '6px 10px',
+          borderRadius: '8px',
+          transition: 'all 0.2s',
+          backgroundColor: isActive ? (type === 'heart' ? '#ffe4e6' : '#dbeafe') : 'transparent',
+        }}
+        onMouseEnter={(e) => !isActive && (e.currentTarget.style.background = '#f1f5f9')}
+        onMouseLeave={(e) => !isActive && (e.currentTarget.style.background = 'transparent')}
+      >
+        <span style={{ fontSize: '1.2rem', filter: isActive ? 'none' : 'grayscale(100%) opacity(0.6)' }}>
+          {type === 'heart' ? '❤️' : '👍'}
+        </span>
+        <span>{count > 0 ? count : (type === 'heart' ? 'Heart' : 'Like')}</span>
+      </button>
+    </div>
+  )
+}
+
 function CommunityForum() {
   const navigate = useNavigate()
   const [user, setUser] = useState(null)
@@ -561,9 +675,12 @@ function CommunityForum() {
                   {notifications.length ? (
                     <div style={{ display: 'grid', gap: '8px', maxHeight: '260px', overflowY: 'auto' }}>
                       {notifications.map((item) => (
-                        <div key={String(item?._id || item?.id)} style={{ border: '1px solid rgba(16,25,39,0.1)', borderRadius: '8px', padding: '8px' }}>
-                          <div style={{ fontWeight: 600, fontSize: '0.92rem' }}>{asText(item?.message, 'Community update')}</div>
-                          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{formatDate(item?.createdAt)}</div>
+                        <div key={String(item?._id || item?.id)} style={{ border: '1px solid rgba(16,25,39,0.1)', borderRadius: '8px', padding: '8px', display: 'flex', gap: '10px', alignItems: 'start' }}>
+                          <UserAvatar url={item?.actorUser?.avatar} name={item?.actorUser?.name || 'System'} size={32} />
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '0.92rem' }}>{asText(item?.message, 'Community update')}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{formatDate(item?.createdAt)}</div>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -619,7 +736,10 @@ function CommunityForum() {
                   return (
                     <article key={id} style={{ background: '#fff', border: '1px solid rgba(16,25,39,0.08)', borderRadius: '14px', padding: '14px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ fontWeight: 700 }}>{asText(post?.authorName, 'Anonymous User')}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <UserAvatar url={post?.user?.avatar} name={post?.authorName} size={40} />
+                          <div style={{ fontWeight: 700 }}>{asText(post?.authorName, 'Anonymous User')}</div>
+                        </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <div style={{ color: '#64748b', fontSize: '0.85rem' }}>{formatDate(post?.createdAt)}</div>
                           {canDeletePost(post) ? (
@@ -670,61 +790,33 @@ function CommunityForum() {
                       ) : null}
 
                       <div style={{ display: 'flex', gap: '16px', marginTop: '12px', marginBottom: '8px' }}>
-                        <button
-                          type="button"
-                          onClick={() => void handleReaction(post, 'heart')}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            color: isHearted ? '#e11d48' : '#64748b',
-                            fontWeight: 600,
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            transition: 'all 0.2s',
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = '#f1f5f9')}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                        >
-                          <span style={{ fontSize: '1.2rem', filter: isHearted ? 'none' : 'grayscale(100%) opacity(0.6)' }}>❤️</span>
-                          <span>{heartCount > 0 ? heartCount : 'Heart'}</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => void handleReaction(post, 'like')}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            color: isLiked ? '#2563eb' : '#64748b',
-                            fontWeight: 600,
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            transition: 'all 0.2s',
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = '#f1f5f9')}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                        >
-                          <span style={{ fontSize: '1.2rem', filter: isLiked ? 'none' : 'grayscale(100%) opacity(0.6)' }}>👍</span>
-                          <span>{likeCount > 0 ? likeCount : 'Like'}</span>
-                        </button>
+                        <ReactionButton 
+                          type="heart" 
+                          count={heartCount} 
+                          isActive={isHearted} 
+                          reactors={reactions.filter(r => r.type === 'heart')} 
+                          onClick={() => void handleReaction(post, 'heart')} 
+                        />
+                        <ReactionButton 
+                          type="like" 
+                          count={likeCount} 
+                          isActive={isLiked} 
+                          reactors={reactions.filter(r => r.type === 'like')} 
+                          onClick={() => void handleReaction(post, 'like')} 
+                        />
                       </div>
 
                       <div style={{ marginTop: '12px', borderTop: '1px solid rgba(16,25,39,0.08)', paddingTop: '10px' }}>
                         <div style={{ fontWeight: 700, marginBottom: '8px' }}>Comments ({comments.length})</div>
                         {comments.slice(-3).map((comment) => (
-                          <div key={String(comment?._id || `${comment?.createdAt}-${comment?.text}`)} style={{ padding: '8px', border: '1px solid rgba(16,25,39,0.08)', borderRadius: '8px', marginBottom: '8px' }}>
-                            <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>
-                              {asText(comment?.commenterName, 'User')} | {formatDate(comment?.createdAt)}
+                          <div key={String(comment?._id || `${comment?.createdAt}-${comment?.text}`)} style={{ padding: '8px', border: '1px solid rgba(16,25,39,0.08)', borderRadius: '8px', marginBottom: '8px', display: 'flex', gap: '10px', alignItems: 'start' }}>
+                            <UserAvatar url={comment?.commenterUser?.avatar} name={comment?.commenterName} size={32} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>
+                                {asText(comment?.commenterName, 'User')} <span style={{ fontWeight: 400, color: '#64748b', fontSize: '0.8rem' }}>• {formatDate(comment?.createdAt)}</span>
+                              </div>
+                              <div style={{ fontSize: '0.92rem', color: '#334155', marginTop: '2px' }}>{asText(comment?.text)}</div>
                             </div>
-                            <div style={{ fontSize: '0.92rem', color: '#334155', marginTop: '2px' }}>{asText(comment?.text)}</div>
                           </div>
                         ))}
                         <div style={{ display: 'flex', gap: '8px' }}>

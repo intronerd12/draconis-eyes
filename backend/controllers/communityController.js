@@ -183,8 +183,9 @@ const getCommunityPosts = async (req, res) => {
     const posts = await CommunityPost.find()
       .sort({ createdAt: -1 })
       .limit(limit)
-      .populate('user', 'name email')
-      .populate('comments.commenterUser', 'name email');
+      .populate('user', 'name email avatar')
+      .populate('comments.commenterUser', 'name email avatar')
+      .populate('reactions.user', 'name email avatar');
 
     res.status(200).json(posts);
   } catch (error) {
@@ -280,8 +281,9 @@ const createCommunityPost = async (req, res) => {
     });
 
     const post = await CommunityPost.findById(created._id)
-      .populate('user', 'name email')
-      .populate('comments.commenterUser', 'name email');
+      .populate('user', 'name email avatar')
+      .populate('comments.commenterUser', 'name email avatar')
+      .populate('reactions.user', 'name email avatar');
 
     return res.status(201).json(post);
   } catch (error) {
@@ -342,8 +344,9 @@ const addCommunityComment = async (req, res) => {
     });
 
     const populated = await CommunityPost.findById(post._id)
-      .populate('user', 'name email')
-      .populate('comments.commenterUser', 'name email');
+      .populate('user', 'name email avatar')
+      .populate('comments.commenterUser', 'name email avatar')
+      .populate('reactions.user', 'name email avatar');
 
     return res.status(201).json(populated);
   } catch (error) {
@@ -370,7 +373,8 @@ const getCommunityNotifications = async (req, res) => {
     const [items, unreadCount] = await Promise.all([
       CommunityNotification.find(recipientQuery)
         .sort({ createdAt: -1 })
-        .limit(limit),
+        .limit(limit)
+        .populate('actorUser', 'name email avatar'),
       CommunityNotification.countDocuments({ ...recipientQuery, readAt: null }),
     ]);
 
@@ -539,9 +543,9 @@ const toggleCommunityReaction = async (req, res) => {
 
     // Return updated post with populated fields
     const populated = await CommunityPost.findById(post._id)
-      .populate('user', 'name email')
-      .populate('comments.commenterUser', 'name email')
-      .populate('reactions.user', 'name email');
+      .populate('user', 'name email avatar')
+      .populate('comments.commenterUser', 'name email avatar')
+      .populate('reactions.user', 'name email avatar');
 
     return res.status(200).json(populated);
   } catch (error) {

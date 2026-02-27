@@ -2,8 +2,8 @@ import { Platform } from 'react-native';
 
 // NOTE: For physical devices, replace 'localhost' with your machine's LAN IP address (e.g., '192.168.1.5')
 // You can find your LAN IP by running 'ipconfig' (Windows) or 'ifconfig' (Mac/Linux) in your terminal.
-const renderUrl = '';
-const ngrokUrl = 'https://460e-2405-8d40-4c59-92df-8d95-8a7e-4c04-5953.ngrok-free.app';
+const renderUrl = 'https://ruin13-dragonfruit.hf.space';
+const ngrokUrl = '';
 const envNgrokUrl =
   typeof process !== 'undefined' && process?.env?.EXPO_PUBLIC_NGROK_URL
     ? process.env.EXPO_PUBLIC_NGROK_URL
