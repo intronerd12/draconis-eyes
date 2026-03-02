@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const { cloudinary } = require('../config/cloudinary');
 const fs = require('fs');
+const { STATUS_REASON_CHOICES, normalizeStatus } = require('../utils/accountStatus');
 
 // @desc    Get all users
 // @route   GET /api/users
@@ -49,12 +50,31 @@ const updateUser = async (req, res) => {
       if (has('name')) user.name = req.body.name;
       if (has('email')) user.email = req.body.email;
       if (has('role')) user.role = req.body.role;
-      if (has('status')) user.status = req.body.status;
+      if (has('status')) user.status = normalizeStatus(req.body.status);
       if (has('avatar')) user.avatar = req.body.avatar; // Allow direct URL update
-      if (user.status === 'active') {
+      const nextStatus = normalizeStatus(user.status);
+      const statusWasProvided = has('status');
+      const reasonWasProvided = has('status_reason');
+
+      if (nextStatus === 'active') {
         user.status_reason = '';
-      } else if (has('status_reason')) {
-        user.status_reason = req.body.status_reason;
+      } else if (statusWasProvided || reasonWasProvided) {
+        const allowedReasons = STATUS_REASON_CHOICES[nextStatus] || [];
+        const requestedReason = reasonWasProvided ? req.body.status_reason : user.status_reason;
+        const normalizedReason = String(requestedReason || '').trim();
+
+        if (!normalizedReason) {
+          return res.status(400).json({ message: `Reason is required when status is ${nextStatus}` });
+        }
+
+        if (!allowedReasons.includes(normalizedReason)) {
+          return res.status(400).json({
+            message: `Invalid reason for ${nextStatus} status`,
+            allowedReasons,
+          });
+        }
+
+        user.status_reason = normalizedReason;
       }
 
       const updatedUser = await user.save();

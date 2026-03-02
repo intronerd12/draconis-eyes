@@ -3,6 +3,29 @@ import toast from 'react-hot-toast';
 import { Search, Filter } from 'lucide-react';
 import { API_BASE_URL } from '../../config/api';
 
+const statusOptions = [
+  { value: 'active', label: 'active' },
+  { value: 'inactive', label: 'deactivated' },
+  { value: 'banned', label: 'banned' },
+];
+
+const statusReasonOptions = {
+  inactive: [
+    'Requested by user',
+    'No recent activity',
+    'Pending identity verification',
+    'Payment or subscription issue',
+    'Temporary security hold',
+  ],
+  banned: [
+    'Spam or scam activity',
+    'Harassment or abuse',
+    'Multiple policy violations',
+    'Fraudulent account behavior',
+    'Use of prohibited content',
+  ],
+};
+
 const UserManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -14,6 +37,9 @@ const UserManagement = () => {
   const [savingUserId, setSavingUserId] = useState(null);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [total, pageSize]);
+
+  const getReasonOptionsForStatus = (status) => statusReasonOptions[(status || '').toLowerCase()] || [];
+  const getDefaultReasonForStatus = (status) => getReasonOptionsForStatus(status)[0] || '';
 
   const loadUsers = React.useCallback(async () => {
     setLoading(true);
@@ -46,15 +72,13 @@ const UserManagement = () => {
     loadUsers();
   }, [loadUsers]);
 
-  // Debounce search
   useEffect(() => {
     const handle = setTimeout(() => {
       if (page !== 1) setPage(1);
-      else loadUsers(); // If page is already 1, loadUsers won't trigger from page change
+      else loadUsers();
     }, 300);
     return () => clearTimeout(handle);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
+  }, [query, page, loadUsers]);
 
   const updateUser = async (userId, patch) => {
     setSavingUserId(userId);
@@ -70,7 +94,7 @@ const UserManagement = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to update user');
 
-      setUsers((prev) => prev.map((u) => (u._id === userId ? { ...u, ...patch } : u)));
+      setUsers((prev) => prev.map((u) => (u._id === userId ? { ...u, ...data } : u)));
       toast.success('User updated');
     } catch (e) {
       toast.error(e?.message || 'Failed to update user');
@@ -80,13 +104,12 @@ const UserManagement = () => {
   };
 
   const formatLastLogin = (iso) => {
-    if (!iso) return '—';
+    if (!iso) return '-';
     const d = new Date(iso);
     return d.toLocaleString();
   };
 
   const roles = ['admin', 'user', 'moderator', 'viewer'];
-  const statuses = ['active', 'inactive', 'banned'];
 
   return (
     <div>
@@ -101,41 +124,41 @@ const UserManagement = () => {
       ) : null}
 
       <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: 'var(--shadow-sm)', overflow: 'hidden' }}>
-        {/* Toolbar */}
         <div style={{ padding: '20px', borderBottom: '1px solid var(--gray-200)', display: 'flex', gap: '15px' }}>
           <div style={{ position: 'relative', flex: 1, maxWidth: '300px' }}>
             <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)' }} />
-            <input 
-              type="text" 
-              placeholder="Search users..." 
+            <input
+              type="text"
+              placeholder="Search users..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              style={{ 
-                width: '100%', 
-                padding: '10px 10px 10px 40px', 
-                border: '1px solid var(--gray-300)', 
+              style={{
+                width: '100%',
+                padding: '10px 10px 10px 40px',
+                border: '1px solid var(--gray-300)',
                 borderRadius: '8px',
                 outline: 'none',
-                fontSize: '0.9rem'
-              }} 
+                fontSize: '0.9rem',
+              }}
             />
           </div>
-          <button style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px', 
-            padding: '10px 15px', 
-            border: '1px solid var(--gray-300)', 
-            borderRadius: '8px', 
-            backgroundColor: 'white',
-            color: 'var(--gray-700)',
-            fontWeight: '500'
-          }}>
+          <button
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 15px',
+              border: '1px solid var(--gray-300)',
+              borderRadius: '8px',
+              backgroundColor: 'white',
+              color: 'var(--gray-700)',
+              fontWeight: '500',
+            }}
+          >
             <Filter size={16} /> Filter
           </button>
         </div>
 
-        {/* Table */}
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ backgroundColor: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)' }}>
@@ -147,119 +170,137 @@ const UserManagement = () => {
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
-              <tr key={user._id} style={{ borderBottom: '1px solid var(--gray-100)' }}>
-                <td style={{ padding: '15px 20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--dragon-flesh)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--dragon-primary)', fontWeight: 'bold' }}>
-                      {(user.name || user.email || 'U').toString().charAt(0).toUpperCase()}
+            {users.map((user) => {
+              const currentStatus = (user.status || 'active').toLowerCase();
+              const reasonOptions = getReasonOptionsForStatus(currentStatus);
+              const currentReason = (user.status_reason || '').toString().trim();
+              const selectedReason = reasonOptions.includes(currentReason)
+                ? currentReason
+                : getDefaultReasonForStatus(currentStatus);
+
+              return (
+                <tr key={user._id} style={{ borderBottom: '1px solid var(--gray-100)' }}>
+                  <td style={{ padding: '15px 20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--dragon-flesh)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--dragon-primary)', fontWeight: 'bold' }}>
+                        {(user.name || user.email || 'U').toString().charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: '500', color: 'var(--gray-900)' }}>{user.name || '-'}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>{user.email || '-'}</div>
+                      </div>
                     </div>
-                    <div>
-                      <div style={{ fontWeight: '500', color: 'var(--gray-900)' }}>{user.name || '—'}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>{user.email || '—'}</div>
-                    </div>
-                  </div>
-                </td>
-                <td style={{ padding: '15px 20px' }}>
-                  <select
-                    value={(user.role || 'user').toLowerCase()}
-                    onChange={(e) => updateUser(user._id, { role: e.target.value })}
-                    disabled={savingUserId === user._id}
-                    style={{
-                      width: '100%',
-                      maxWidth: '160px',
-                      padding: '8px 10px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--gray-300)',
-                      backgroundColor: 'white',
-                      color: 'var(--gray-700)',
-                      fontWeight: 600,
-                      textTransform: 'lowercase',
-                    }}
-                  >
-                    {roles.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td style={{ padding: '15px 20px' }}>
-                  <select
-                    value={(user.status || 'active').toLowerCase()}
-                    onChange={(e) => {
-                      const nextStatus = e.target.value.toLowerCase();
-                      const currentStatus = (user.status || 'active').toLowerCase();
-                      if (nextStatus === currentStatus) return;
+                  </td>
 
-                      if (nextStatus === 'active') {
-                        updateUser(user._id, { status: 'active', status_reason: '' });
-                        return;
-                      }
+                  <td style={{ padding: '15px 20px' }}>
+                    <select
+                      value={(user.role || 'user').toLowerCase()}
+                      onChange={(e) => updateUser(user._id, { role: e.target.value })}
+                      disabled={savingUserId === user._id}
+                      style={{
+                        width: '100%',
+                        maxWidth: '160px',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--gray-300)',
+                        backgroundColor: 'white',
+                        color: 'var(--gray-700)',
+                        fontWeight: 600,
+                        textTransform: 'lowercase',
+                      }}
+                    >
+                      {roles.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
 
-                      const reason = window.prompt(
-                        `Reason for setting this user to ${nextStatus}:`,
-                        (user.status_reason || '').toString()
-                      );
+                  <td style={{ padding: '15px 20px' }}>
+                    <select
+                      value={currentStatus}
+                      onChange={(e) => {
+                        const nextStatus = e.target.value.toLowerCase();
+                        if (nextStatus === currentStatus) return;
 
-                      if (!reason || !reason.trim()) {
-                        toast.error('Reason is required');
-                        return;
-                      }
+                        if (nextStatus === 'active') {
+                          updateUser(user._id, { status: 'active', status_reason: '' });
+                          return;
+                        }
 
-                      updateUser(user._id, { status: nextStatus, status_reason: reason.trim() });
-                    }}
-                    disabled={savingUserId === user._id}
-                    style={{
-                      width: '100%',
-                      maxWidth: '140px',
-                      padding: '8px 10px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--gray-300)',
-                      backgroundColor: 'white',
-                      color: 'var(--gray-700)',
-                      fontWeight: 600,
-                      textTransform: 'lowercase',
-                    }}
-                  >
-                    {statuses.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td style={{ padding: '15px 20px' }}>
-                  <input
-                    key={`${user._id}-${user.status || 'active'}-${user.status_reason || ''}`}
-                    type="text"
-                    defaultValue={(user.status_reason || '').toString()}
-                    placeholder={(user.status || 'active').toLowerCase() === 'active' ? '—' : 'Reason for inactive/banned'}
-                    disabled={(user.status || 'active').toLowerCase() === 'active' || savingUserId === user._id}
-                    onBlur={(e) => {
-                      const next = (e.target.value || '').toString().trim();
-                      const current = (user.status_reason || '').toString().trim();
-                      if (next === current) return;
-                      updateUser(user._id, { status_reason: next });
-                    }}
-                    style={{
-                      width: '100%',
-                      maxWidth: '320px',
-                      padding: '8px 10px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--gray-300)',
-                      backgroundColor: (user.status || 'active').toLowerCase() === 'active' ? 'var(--gray-50)' : 'white',
-                      color: 'var(--gray-700)',
-                      fontWeight: 600,
-                      opacity: (user.status || 'active').toLowerCase() === 'active' ? 0.7 : 1,
-                    }}
-                  />
-                </td>
-                <td style={{ padding: '15px 20px', color: 'var(--gray-500)', fontSize: '0.9rem' }}>
-                  {formatLastLogin(user.last_login_at)}
-                </td>
-              </tr>
-            ))}
+                        const allowedReasons = getReasonOptionsForStatus(nextStatus);
+                        const existingReason = (user.status_reason || '').toString().trim();
+                        const nextReason = allowedReasons.includes(existingReason)
+                          ? existingReason
+                          : getDefaultReasonForStatus(nextStatus);
+
+                        if (!nextReason) {
+                          toast.error(`No reasons configured for ${nextStatus}`);
+                          return;
+                        }
+
+                        updateUser(user._id, { status: nextStatus, status_reason: nextReason });
+                      }}
+                      disabled={savingUserId === user._id}
+                      style={{
+                        width: '100%',
+                        maxWidth: '160px',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--gray-300)',
+                        backgroundColor: 'white',
+                        color: 'var(--gray-700)',
+                        fontWeight: 600,
+                        textTransform: 'lowercase',
+                      }}
+                    >
+                      {statusOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+
+                  <td style={{ padding: '15px 20px' }}>
+                    {currentStatus === 'active' ? (
+                      <span style={{ color: 'var(--gray-500)', fontWeight: 600 }}>-</span>
+                    ) : (
+                      <select
+                        value={selectedReason}
+                        disabled={savingUserId === user._id}
+                        onChange={(e) => {
+                          const nextReason = e.target.value;
+                          if (!nextReason || nextReason === currentReason) return;
+                          updateUser(user._id, { status_reason: nextReason });
+                        }}
+                        style={{
+                          width: '100%',
+                          maxWidth: '320px',
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--gray-300)',
+                          backgroundColor: 'white',
+                          color: 'var(--gray-700)',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {reasonOptions.map((reason) => (
+                          <option key={reason} value={reason}>
+                            {reason}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
+
+                  <td style={{ padding: '15px 20px', color: 'var(--gray-500)', fontSize: '0.9rem' }}>
+                    {formatLastLogin(user.last_login_at)}
+                  </td>
+                </tr>
+              );
+            })}
 
             {!loading && users.length === 0 ? (
               <tr>
@@ -270,12 +311,11 @@ const UserManagement = () => {
             ) : null}
           </tbody>
         </table>
-        
-        {/* Pagination */}
+
         <div style={{ padding: '15px 20px', borderTop: '1px solid var(--gray-200)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--gray-500)', fontSize: '0.85rem' }}>
           <div>
             {loading
-              ? 'Loading…'
+              ? 'Loading...'
               : `Showing ${(page - 1) * pageSize + 1} to ${Math.min(page * pageSize, total)} of ${total} entries`}
           </div>
           <div style={{ display: 'flex', gap: '5px' }}>

@@ -77,7 +77,7 @@ function Auth() {
     const payload = isLogin ? { email, password } : { name, email, password }
 
     try {
-      const res = await fetch(`http://localhost:5000${endpoint}`, {
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -129,6 +129,9 @@ function Auth() {
     setFormData({ name: '', email: '', password: '' })
   }
 
+  // login background video (dragon fruit showcase)
+  const BG_VIDEO = 'https://res.cloudinary.com/dkqnaqbvg/video/upload/v1771296730/4443529-hd_1920_1080_25fps_up7btg.mp4';
+
   const SLIDES = [
     { src: '/landing/slider/slide-01.jpg', alt: 'Field to market', label: 'Overview', link: '/how-it-works', cta: 'How it works' },
     { src: '/landing/slider/slide-02.jpg', alt: 'Inspection closeup', label: 'Features', link: '/features', cta: 'See features' },
@@ -154,6 +157,9 @@ function Auth() {
 
   return (
     <div className="auth-container">
+      {/* background video */}
+      <video className="auth-video-bg" src={BG_VIDEO} autoPlay muted loop playsInline />
+
       <div className="auth-slider" style={{ marginBottom: '18px' }}>
         <div className="home-slider-shell">
           <div className="home-slider-track">

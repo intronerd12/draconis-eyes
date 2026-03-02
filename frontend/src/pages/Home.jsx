@@ -5,7 +5,6 @@ import SystemStatus from '../components/SystemStatus'
 import ParallaxDatasetSection from '../components/marketing/ParallaxDatasetSection'
 import { BRAND_NAME } from '../config/brand'
 import { API_BASE_URL } from '../config/api'
-import { WALLPAPER_DRAGON_IMAGES } from '../config/wallpaperDragon'
 import '../App.css'
 
 function Home() {
@@ -57,7 +56,10 @@ function Home() {
     { id: 'analyze', title: 'AI Analysis', path: '/ai-analysis', icon: '02', desc: 'Upload and analyze fruit images' },
     { id: 'community', title: 'Community Forum', path: '/community', icon: '03', desc: 'Share and discuss scan results with other users' },
   ]
-  const dashboardWallpapers = WALLPAPER_DRAGON_IMAGES.slice(0, 6)
+  const dashboardWallpapers = Array.from({ length: 6 }, () => ({
+    src: '/wallpaper-dragon/wallpaper-10.jpg',
+    label: 'Wallpaper Dragon 10',
+  }))
 
   return (
     <div className="app-shell">
@@ -236,7 +238,7 @@ function Home() {
         </section>
       </main>
 
-      <footer style={{ background: 'linear-gradient(135deg, #D81B60, #B8105B)', color: '#fff', padding: '40px 0' }}>
+      <footer style={{ background: 'linear-gradient(180deg, #EC6565, #C84F4F)', color: '#fff', padding: '40px 0' }}>
         <div className="container-pro">
           <div style={{ color: '#fff', fontSize: '1.3rem', fontWeight: '700', marginBottom: '12px' }}>DF {BRAND_NAME}</div>
           <p style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '16px' }}>

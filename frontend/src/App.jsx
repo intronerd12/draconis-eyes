@@ -1,5 +1,7 @@
+import { useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
+import toast from 'react-hot-toast'
 import Landing from './pages/Landing'
 import About from './pages/About'
 import HowItWorks from './pages/HowItWorks'
@@ -20,9 +22,76 @@ import ScannedItems from './pages/admin/ScannedItems'
 import ApiMonitoring from './pages/admin/ApiMonitoring'
 import EnvironmentalData from './pages/admin/EnvironmentalData'
 import ProtectedRoute from './components/admin/ProtectedRoute'
+import { API_BASE_URL } from './config/api'
 import './App.css'
 
 function App() {
+  const forcedLogoutRef = useRef(false)
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const rawUser = localStorage.getItem('user')
+      if (!rawUser) {
+        forcedLogoutRef.current = false
+        return
+      }
+
+      let parsedUser
+      try {
+        parsedUser = JSON.parse(rawUser)
+      } catch (_error) {
+        localStorage.removeItem('user')
+        return
+      }
+
+      if (!parsedUser?.token) return
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/session`, {
+          headers: {
+            Authorization: `Bearer ${parsedUser.token}`,
+          },
+        })
+
+        if (res.ok) {
+          forcedLogoutRef.current = false
+          return
+        }
+
+        if (res.status !== 401 && res.status !== 403) return
+
+        if (forcedLogoutRef.current) return
+        forcedLogoutRef.current = true
+
+        const body = await res.json().catch(() => ({}))
+        localStorage.removeItem('user')
+        toast.error(body?.message || 'Your session ended due to account status update.')
+        if (window.location.pathname !== '/login') {
+          window.location.assign('/login')
+        }
+      } catch (_error) {
+        // Ignore transient network errors; only force logout on explicit auth/status failures.
+      }
+    }
+
+    const visibilityHandler = () => {
+      if (document.visibilityState === 'visible') {
+        checkSession()
+      }
+    }
+
+    checkSession()
+    const intervalId = window.setInterval(checkSession, 30000)
+    window.addEventListener('focus', checkSession)
+    document.addEventListener('visibilitychange', visibilityHandler)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', checkSession)
+      document.removeEventListener('visibilitychange', visibilityHandler)
+    }
+  }, [])
+
   return (
     <BrowserRouter>
       <Toaster position="top-center" reverseOrder={false} />

@@ -14,7 +14,6 @@ import {
 } from 'lucide-react'
 import MarketingFooter from '../components/marketing/MarketingFooter'
 import MarketingHeader from '../components/marketing/MarketingHeader'
-import { getRandomWallpaperSet } from '../config/wallpaperDragon'
 import './Landing.css'
 import './MarketingPages.css'
 
@@ -69,8 +68,20 @@ const EXTENSIONS = [
   },
 ]
 
+const MARKETING_BOX_BACKGROUNDS = [
+  '/landing/slider/slide-01.jpg',
+  '/landing/slider/slide-02.jpg',
+  '/landing/slider/slide-03.jpg',
+  '/landing/slider/slide-04.jpg',
+  '/landing/slider/slide-05.jpg',
+  '/landing/slider/slide-06.jpg',
+]
+
 function Features() {
-  const wallpapers = useMemo(() => getRandomWallpaperSet(4), [])
+  const wallpapers = useMemo(
+    () => Array.from({ length: 4 }, () => ({ src: '/wallpaper-dragon/wallpaper-10.jpg', label: 'Wallpaper Dragon 10' })),
+    []
+  )
 
   return (
     <div className="pro-landing mk-page">
@@ -142,8 +153,13 @@ function Features() {
             </div>
 
             <div className="mk-grid-3">
-              {CORE_FEATURES.map(({ title, description, icon }) => (
-                <article key={title} className="mk-info-card">
+              {CORE_FEATURES.map(({ title, description, icon }, index) => (
+                <article
+                  key={title}
+                  className="mk-info-card"
+                  style={{ '--mk-box-bg-image': `url(${MARKETING_BOX_BACKGROUNDS[index % MARKETING_BOX_BACKGROUNDS.length]})` }}
+                >
+                  <div className="mk-box-bg" aria-hidden="true" />
                   <div className="mk-info-icon">{createElement(icon, { size: 18 })}</div>
                   <h3>{title}</h3>
                   <p>{description}</p>
@@ -164,8 +180,13 @@ function Features() {
             </div>
 
             <div className="mk-grid-3">
-              {EXTENSIONS.map(({ title, description, icon }) => (
-                <article key={title} className="mk-info-card">
+              {EXTENSIONS.map(({ title, description, icon }, index) => (
+                <article
+                  key={title}
+                  className="mk-info-card"
+                  style={{ '--mk-box-bg-image': `url(${MARKETING_BOX_BACKGROUNDS[(index + 3) % MARKETING_BOX_BACKGROUNDS.length]})` }}
+                >
+                  <div className="mk-box-bg" aria-hidden="true" />
                   <div className="mk-info-icon">{createElement(icon, { size: 18 })}</div>
                   <h3>{title}</h3>
                   <p>{description}</p>

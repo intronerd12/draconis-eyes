@@ -918,6 +918,17 @@ nav {
   transform: rotate(45deg);
 }
 
+.auth-video-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  opacity: 0.55;
+}
+
 .auth-card {
   width: 100%;
   max-width: 420px;
@@ -1003,6 +1014,7 @@ nav {
 }
 
 .auth-shell {
+  position: relative;
   min-height: 100vh;
   padding: 28px;
   background: radial-gradient(circle at 20% 10%, rgba(0, 179, 77, 0.22) 0%, transparent 45%),
@@ -1010,6 +1022,17 @@ nav {
     linear-gradient(135deg, #0b1220 0%, #111827 60%, #0b1220 100%);
   display: grid;
   place-items: center;
+}
+
+.auth-video-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  opacity: 0.5;
 }
 
 .auth-grid {

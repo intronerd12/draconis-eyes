@@ -10,6 +10,9 @@ import { API_BASE_URL } from '../config/api';
 import '../App.css';
 
 function AuthPro() {
+  // background video for login
+  const BG_VIDEO = 'https://res.cloudinary.com/dkqnaqbvg/video/upload/v1771296730/4443529-hd_1920_1080_25fps_up7btg.mp4';
+
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
@@ -193,6 +196,7 @@ function AuthPro() {
 
   return (
     <div className="auth-shell">
+      <video className="auth-video-bg" src={BG_VIDEO} autoPlay muted loop playsInline />
       <div className="auth-grid">
         <div className="auth-left">
           <div className="auth-left-top">

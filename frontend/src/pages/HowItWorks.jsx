@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, BarChart3, Camera, CheckCircle2, ClipboardList, Cpu, DollarSign, RefreshCw } from 'lucide-react'
 import MarketingFooter from '../components/marketing/MarketingFooter'
 import MarketingHeader from '../components/marketing/MarketingHeader'
-import { getRandomWallpaperSet } from '../config/wallpaperDragon'
 import './Landing.css'
 import './MarketingPages.css'
 
@@ -52,8 +51,20 @@ const DELIVERY = [
   },
 ]
 
+const MARKETING_BOX_BACKGROUNDS = [
+  '/landing/slider/slide-01.jpg',
+  '/landing/slider/slide-02.jpg',
+  '/landing/slider/slide-03.jpg',
+  '/landing/slider/slide-04.jpg',
+  '/landing/slider/slide-05.jpg',
+  '/landing/slider/slide-06.jpg',
+]
+
 function HowItWorks() {
-  const wallpapers = useMemo(() => getRandomWallpaperSet(4), [])
+  const wallpapers = useMemo(
+    () => Array.from({ length: 4 }, () => ({ src: '/wallpaper-dragon/wallpaper-10.jpg', label: 'Wallpaper Dragon 10' })),
+    []
+  )
 
   return (
     <div className="pro-landing mk-page">
@@ -125,8 +136,13 @@ function HowItWorks() {
 
             <div className="mk-timeline">
               <div className="mk-timeline-track">
-                {WORKFLOW.map(({ id, title, description, icon }) => (
-                  <article key={id} className="mk-step">
+                {WORKFLOW.map(({ id, title, description, icon }, index) => (
+                  <article
+                    key={id}
+                    className="mk-step"
+                    style={{ '--mk-box-bg-image': `url(${MARKETING_BOX_BACKGROUNDS[index % MARKETING_BOX_BACKGROUNDS.length]})` }}
+                  >
+                    <div className="mk-box-bg" aria-hidden="true" />
                     <span className="mk-step-id">{id}</span>
                     <div className="mk-info-icon">{createElement(icon, { size: 18 })}</div>
                     <h3>{title}</h3>
@@ -148,8 +164,13 @@ function HowItWorks() {
               <p>Outputs are built to support immediate action and long-term performance improvement.</p>
             </div>
             <div className="mk-grid-3">
-              {DELIVERY.map(({ title, description, icon }) => (
-                <article key={title} className="mk-info-card">
+              {DELIVERY.map(({ title, description, icon }, index) => (
+                <article
+                  key={title}
+                  className="mk-info-card"
+                  style={{ '--mk-box-bg-image': `url(${MARKETING_BOX_BACKGROUNDS[(index + 2) % MARKETING_BOX_BACKGROUNDS.length]})` }}
+                >
+                  <div className="mk-box-bg" aria-hidden="true" />
                   <div className="mk-info-icon">{createElement(icon, { size: 18 })}</div>
                   <h3>{title}</h3>
                   <p>{description}</p>

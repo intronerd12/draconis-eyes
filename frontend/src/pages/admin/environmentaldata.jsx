@@ -28,6 +28,9 @@ const badgeFor = (color) => {
   return { bg: '#fee2e2', fg: '#991b1b', border: '#fecaca' };
 };
 
+const AUTO_ZOOM_OFFSET = 2;
+const MAX_MAP_ZOOM = 18;
+
 const EnvironmentalData = () => {
   const [provinces, setProvinces] = useState([]);
   const [selectedProvince, setSelectedProvince] = useState('Metro Manila');
@@ -101,23 +104,27 @@ const EnvironmentalData = () => {
   const badge = badgeFor(recColor);
   const mapKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
   const mapCenter = useMemo(() => getMapCenter(selectedProvince), [selectedProvince]);
+  const effectiveZoom = useMemo(
+    () => clamp((Number(mapCenter.zoom) || 10) + AUTO_ZOOM_OFFSET, 3, MAX_MAP_ZOOM),
+    [mapCenter]
+  );
   const googleEmbedSrc = useMemo(() => {
-    const { lat, lng, zoom } = mapCenter;
+    const { lat, lng } = mapCenter;
     if (mapKey) {
       const params = new URLSearchParams({
         key: mapKey,
         center: `${lat},${lng}`,
-        zoom: String(zoom || 10),
+        zoom: String(effectiveZoom),
         maptype: 'roadmap',
       });
       return `https://www.google.com/maps/embed/v1/view?${params.toString()}`;
     }
-    return `https://www.google.com/maps?q=${encodeURIComponent(`${lat},${lng}`)}&z=${encodeURIComponent(String(zoom || 10))}&output=embed`;
-  }, [mapCenter, mapKey]);
+    return `https://www.google.com/maps?q=${encodeURIComponent(`${lat},${lng}`)}&z=${encodeURIComponent(String(effectiveZoom))}&output=embed`;
+  }, [mapCenter, mapKey, effectiveZoom]);
 
   const osmEmbedSrc = useMemo(() => {
     const { lat, lng } = mapCenter;
-    const d = 0.35;
+    const d = clamp(1.8 / effectiveZoom, 0.06, 0.35);
     const left = lng - d;
     const bottom = lat - d;
     const right = lng + d;
@@ -125,7 +132,7 @@ const EnvironmentalData = () => {
     return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(
       `${left},${bottom},${right},${top}`
     )}&layer=mapnik&marker=${encodeURIComponent(`${lat},${lng}`)}`;
-  }, [mapCenter]);
+  }, [mapCenter, effectiveZoom]);
 
   const embedSrc = mapProvider === 'osm' ? osmEmbedSrc : googleEmbedSrc;
   const googleOpenUrl = useMemo(() => {
@@ -134,11 +141,11 @@ const EnvironmentalData = () => {
     return `https://www.google.com/maps/search/?${params.toString()}`;
   }, [mapCenter]);
   const osmOpenUrl = useMemo(() => {
-    const { lat, lng, zoom } = mapCenter;
+    const { lat, lng } = mapCenter;
     return `https://www.openstreetmap.org/?mlat=${encodeURIComponent(lat)}&mlon=${encodeURIComponent(lng)}#map=${encodeURIComponent(
-      zoom || 10
+      effectiveZoom
     )}/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}`;
-  }, [mapCenter]);
+  }, [mapCenter, effectiveZoom]);
 
   return (
     <div>
@@ -348,7 +355,7 @@ const EnvironmentalData = () => {
             <div style={{ position: 'relative', width: '100%', height: 340, backgroundColor: 'var(--gray-50)' }}>
               <iframe
                 title="Region map"
-                key={`${mapProvider}-${mapCenter.lat}-${mapCenter.lng}-${mapKey ? 'k' : 'nok'}`}
+                key={`${mapProvider}-${mapCenter.lat}-${mapCenter.lng}-${effectiveZoom}-${mapKey ? 'k' : 'nok'}`}
                 src={embedSrc}
                 style={{ border: 0, width: '100%', height: '100%' }}
                 loading="lazy"

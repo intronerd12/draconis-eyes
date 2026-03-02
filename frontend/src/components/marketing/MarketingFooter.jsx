@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { Facebook, Instagram, Music2, Youtube } from 'lucide-react'
 import BrandMark from '../BrandMark'
 import { BRAND_NAME, BRAND_TAGLINE } from '../../config/brand'
 
@@ -13,13 +12,6 @@ const ACCESS_LINKS = [
   { to: '/', label: 'Landing' },
   { to: '/home', label: 'Workspace' },
   { to: '/login', label: 'Login' },
-]
-
-const SOCIAL_LINKS = [
-  { href: 'https://www.youtube.com', label: 'YouTube', icon: Youtube },
-  { href: 'https://www.instagram.com', label: 'Instagram', icon: Instagram },
-  { href: 'https://www.facebook.com', label: 'Facebook', icon: Facebook },
-  { href: 'https://www.tiktok.com', label: 'TikTok', icon: Music2 },
 ]
 
 function MarketingFooter() {
@@ -56,21 +48,6 @@ function MarketingFooter() {
           {ACCESS_LINKS.map((item) => (
             <Link key={item.to} to={item.to}>{item.label}</Link>
           ))}
-        </div>
-
-        <div className="lp-footer-links lp-footer-follow">
-          <h3>Follow Us</h3>
-          <p>Get the latest updates from our team.</p>
-          <div className="lp-footer-social">
-            {SOCIAL_LINKS.map(({ href, label, icon }) => {
-              const IconComponent = icon
-              return (
-                <a key={label} href={href} target="_blank" rel="noreferrer" aria-label={label}>
-                  <IconComponent size={16} />
-                </a>
-              )
-            })}
-          </div>
         </div>
       </div>
 

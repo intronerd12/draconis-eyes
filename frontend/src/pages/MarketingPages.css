@@ -1,6 +1,6 @@
 .mk-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #fdf2f8 0%, #fff 60%);
+  background: linear-gradient(180deg, #fdf2f8 0%, #FBE3E3 60%);
 }
 
 .mk-main {
@@ -10,7 +10,7 @@
 .mk-hero {
   padding: 78px 0 64px;
   min-height: clamp(560px, 72vh, 700px);
-  background: linear-gradient(135deg, #D81B60, #E85D93);
+  background: linear-gradient(135deg, #EC6565, #F08B8B);
   color: #fff;
   position: relative;
   overflow: hidden;
@@ -53,8 +53,8 @@
   letter-spacing: 0.1em;
   font-weight: 800;
   color: #6f2c44;
-  background: rgba(192, 36, 87, 0.12);
-  border: 1px solid rgba(192, 36, 87, 0.16);
+  background: rgba(236, 101, 101, 0.12);
+  border: 1px solid rgba(236, 101, 101, 0.16);
   border-radius: 999px;
   padding: 8px 12px;
 }
@@ -81,7 +81,7 @@
 
 .mk-title .accent {
   display: block;
-  background: linear-gradient(130deg, #D81B60, #1f9d63);
+  background: linear-gradient(130deg, #EC6565, #1f9d63);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -138,7 +138,7 @@
 }
 
 .mk-card-head svg {
-  color: #D81B60;
+  color: #EC6565;
 }
 
 .mk-card h3 {
@@ -179,14 +179,14 @@
 }
 
 .mk-section:nth-child(even) .mk-info-card {
-  background: white;
+  background: #FBE3E3;
   border-color: rgba(16, 25, 39, 0.11);
   color: inherit;
 }
 
 .mk-section:nth-child(even) .mk-info-icon {
-  background: rgba(216, 27, 96, 0.1);
-  color: #D81B60;
+  background: rgba(236, 101, 101, 0.12);
+  color: #EC6565;
 }
 
 .mk-section:nth-child(even) .mk-info-card h3 {
@@ -250,18 +250,31 @@
 .mk-info-card {
   border: 1px solid rgba(16, 25, 39, 0.11);
   border-radius: 16px;
-  background: white;
+  background: #FBE3E3;
   padding: 16px;
   display: grid;
   gap: 8px;
+}
+
+.mk-box-bg {
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.44);
+  background-image:
+    linear-gradient(140deg, rgba(16, 25, 39, 0.24), rgba(16, 25, 39, 0.08)),
+    var(--mk-box-bg-image, url('/landing/slider/slide-01.jpg'));
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 10px 18px rgba(16, 25, 39, 0.16);
 }
 
 .mk-info-icon {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: rgba(216, 27, 96, 0.1);
-  color: #D81B60;
+  background: rgba(236, 101, 101, 0.12);
+  color: #EC6565;
   display: grid;
   place-items: center;
 }
@@ -315,7 +328,7 @@
 
 .mk-step {
   border: 1px solid rgba(16, 25, 39, 0.1);
-  background: white;
+  background: #FBE3E3;
   border-radius: 14px;
   padding: 13px;
   display: grid;
@@ -356,6 +369,23 @@
   box-shadow: 0 10px 24px rgba(16, 25, 39, 0.08);
   padding: 18px;
   transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  column-gap: 14px;
+  align-items: start;
+}
+
+.mk-team-photo {
+  width: 140px;
+  height: 220px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid rgba(236, 101, 101, 0.22);
+  transition: transform 0.25s ease;
+  grid-column: 1;
+  grid-row: 1 / span 4;
+  align-self: start;
 }
 
 .mk-team-card::before {
@@ -378,9 +408,74 @@
   box-shadow: 0 20px 34px rgba(16, 25, 39, 0.14);
 }
 
+.mk-team-card:hover .mk-team-photo {
+  transform: scale(1.02);
+}
+
 .mk-team-card:hover::before {
   opacity: 1;
   transform: rotate(20deg) translateX(90%);
+}
+
+.mk-team-card:focus-visible {
+  outline: 3px solid rgba(236, 101, 101, 0.6);
+  outline-offset: 2px;
+}
+
+.mk-team-top,
+.mk-team-card h3,
+.mk-team-card p {
+  grid-column: 2;
+}
+
+.mk-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 999;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.mk-modal {
+  width: 100%;
+  max-width: 520px;
+  background: linear-gradient(140deg, #ffffff, #f9fbff);
+  border: 1px solid rgba(236, 101, 101, 0.22);
+  border-radius: 16px;
+  box-shadow: 0 24px 44px rgba(16, 25, 39, 0.18);
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+.mk-modal-photo {
+  width: 100%;
+  height: 240px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid rgba(236, 101, 101, 0.22);
+}
+
+.mk-modal-title {
+  font-family: 'Sora', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #0f1728;
+}
+
+.mk-modal-desc {
+  color: #4f5d73;
+  line-height: 1.65;
+}
+
+.mk-modal-actions {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .mk-team-top {
@@ -558,14 +653,14 @@
 }
 
 .mk-step:hover .mk-step-id {
-  color: #D81B60;
+  color: #EC6565;
 }
 
 .mk-card:focus-within,
 .mk-info-card:focus-within,
 .mk-step:focus-within,
 .mk-cta:focus-within {
-  border-color: rgba(216, 27, 96, 0.28);
+  border-color: rgba(236, 101, 101, 0.28);
 }
 
 @media (max-width: 1060px) {
@@ -599,6 +694,17 @@
 }
 
 @media (max-width: 720px) {
+  .mk-team-card {
+    grid-template-columns: 1fr;
+  }
+
+  .mk-team-photo {
+    width: 100%;
+    height: 240px;
+    grid-column: 1;
+    grid-row: auto;
+  }
+
   .mk-main {
     padding: 34px 0 62px;
   }

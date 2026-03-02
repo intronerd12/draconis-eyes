@@ -176,6 +176,29 @@ export const socialLogin = async (payload) => {
   }
 };
 
+export const getSessionStatus = async (token) => {
+  try {
+    const response = await apiFetch('/api/auth/session', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const error = new Error(data?.message || 'Session check failed');
+      error.status = response.status;
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    throw error;
+  }
+};
+
 export const updateUser = async (userId, userData) => {
   try {
     const response = await apiFetch(`/api/users/${userId}`, {

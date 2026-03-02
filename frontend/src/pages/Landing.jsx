@@ -17,7 +17,6 @@ import {
 } from 'lucide-react'
 import MarketingFooter from '../components/marketing/MarketingFooter'
 import MarketingHeader from '../components/marketing/MarketingHeader'
-import { getRandomWallpaperSet } from '../config/wallpaperDragon'
 import './Landing.css'
 
 // Interactive showcase carousel data - dragon fruit content with smooth animations
@@ -141,11 +140,23 @@ const MODULES = [
   },
 ]
 
+const SECTION_BOX_BACKGROUNDS = [
+  '/landing/slider/slide-01.jpg',
+  '/landing/slider/slide-02.jpg',
+  '/landing/slider/slide-03.jpg',
+  '/landing/slider/slide-04.jpg',
+  '/landing/slider/slide-05.jpg',
+  '/landing/slider/slide-06.jpg',
+]
+
 function Landing() {
   const [activeVideoSlide, setActiveVideoSlide] = useState(0)
   const [isPlaying, setIsPlaying] = useState(true)
   const videoRefs = useRef([])
-  const wallpapers = useMemo(() => getRandomWallpaperSet(2), [])
+  const wallpapers = useMemo(
+    () => Array.from({ length: 2 }, () => ({ src: '/wallpaper-dragon/wallpaper-10.jpg', label: 'Wallpaper Dragon 10' })),
+    []
+  )
 
   // Auto-advance video slider when playing
   useEffect(() => {
@@ -187,7 +198,7 @@ function Landing() {
     <div className="pro-landing">
       <MarketingHeader />
 
-      <main style={{ background: 'linear-gradient(180deg, #fdf2f8 0%, #fff 50%)' }}>
+      <main style={{ background: 'linear-gradient(180deg, #fdf2f8 0%, #FBE3E3 50%)' }}>
         {/* Video slider section */}
         <section
           className="lp-video-hero df-parallax-surface df-parallax-dark"
@@ -354,23 +365,28 @@ function Landing() {
 
         <section
           className="lp-section df-parallax-surface df-parallax-light"
-          style={{ backgroundColor: '#f8fafc' }}
         >
           <div className="container-pro">
             <div className="lp-section-head">
-              <h2 style={{ color: '#0f1728' }}>Explore the platform</h2>
-              <p style={{ color: '#6b7280' }}>Jump to the pages your team uses most often, with clear purpose and faster onboarding.</p>
+              <h2>Explore the platform</h2>
+              <p>Jump to the pages your team uses most often, with clear purpose and faster onboarding.</p>
             </div>
 
             <div className="lp-link-grid">
-              {QUICK_LINKS.map(({ to, title, description, icon }) => (
-                <Link to={to} key={title} className="lp-link-card" style={{ background: '#fff', boxShadow: '0 4px 12px rgba(216, 27, 96, 0.1)' }}>
-                  <span className="lp-link-icon" style={{ color: '#D81B60' }}>
+              {QUICK_LINKS.map(({ to, title, description, icon }, index) => (
+                <Link
+                  to={to}
+                  key={title}
+                  className="lp-link-card"
+                  style={{ '--lp-box-bg-image': `url(${SECTION_BOX_BACKGROUNDS[index % SECTION_BOX_BACKGROUNDS.length]})` }}
+                >
+                  <div className="lp-box-bg" aria-hidden="true" />
+                  <span className="lp-link-icon">
                     {createElement(icon, { size: 18 })}
                   </span>
-                  <h3 style={{ color: '#0f1728' }}>{title}</h3>
-                  <p style={{ color: '#6b7280' }}>{description}</p>
-                  <span className="lp-link-cta" style={{ color: '#D81B60' }}>
+                  <h3>{title}</h3>
+                  <p>{description}</p>
+                  <span className="lp-link-cta">
                     Open page
                     <ArrowRight size={14} />
                   </span>
@@ -382,13 +398,12 @@ function Landing() {
 
         <section
           id="workflow"
-          className="lp-section lp-section-alt df-parallax-surface df-parallax-dark"
-          style={{ backgroundColor: '#101927', color: '#fff' }}
+          className="lp-section lp-section-alt df-parallax-surface df-parallax-light"
         >
           <div className="container-pro">
             <div className="lp-section-head">
-              <h2 style={{ color: '#fff' }}>How operations flow</h2>
-              <p style={{ color: 'rgba(255, 255, 255, 0.95)' }}>
+              <h2>How operations flow</h2>
+              <p>
                 Built for real-world usage: scan quickly, standardize decisions, and keep historical quality data
                 organized.
               </p>
@@ -396,14 +411,19 @@ function Landing() {
 
             <div className="lp-workflow-grid">
               {WORKFLOW.map(({ title, description, icon, stats }, index) => (
-                <article key={title} className="lp-flow-card" style={{ background: 'rgba(255, 255, 255, 0.12)', borderColor: 'rgba(255, 255, 255, 0.2)', color: '#fff' }}>
-                  <span className="lp-flow-step" style={{ color: 'rgba(255, 255, 255, 0.5)' }}>0{index + 1}</span>
-                  <div className="lp-flow-icon" style={{ background: 'rgba(255, 255, 255, 0.15)', color: '#fff' }}>
+                <article
+                  key={title}
+                  className="lp-flow-card"
+                  style={{ '--lp-box-bg-image': `url(${SECTION_BOX_BACKGROUNDS[(index + 2) % SECTION_BOX_BACKGROUNDS.length]})` }}
+                >
+                  <div className="lp-box-bg" aria-hidden="true" />
+                  <span className="lp-flow-step">0{index + 1}</span>
+                  <div className="lp-flow-icon">
                     {createElement(icon, { size: 18 })}
                   </div>
-                  <h3 style={{ color: '#fff' }}>{title}</h3>
-                  <p style={{ color: 'rgba(255, 255, 255, 0.9)' }}>{description}</p>
-                  {stats && <span className="lp-flow-stat" style={{ color: 'rgba(255, 255, 255, 0.8)' }}>{stats}</span>}
+                  <h3>{title}</h3>
+                  <p>{description}</p>
+                  {stats && <span className="lp-flow-stat">{stats}</span>}
                 </article>
               ))}
             </div>
@@ -413,23 +433,27 @@ function Landing() {
         <section
           id="modules"
           className="lp-section df-parallax-surface df-parallax-light"
-          style={{ backgroundColor: '#f8fafc' }}
         >
           <div className="container-pro">
             <div className="lp-section-head">
-              <h2 style={{ color: '#0f1728' }}>Core intelligence modules</h2>
-              <p style={{ color: '#6b7280' }}>Each module is purpose-built to reduce guesswork and increase consistency across your team.</p>
+              <h2>Core intelligence modules</h2>
+              <p>Each module is purpose-built to reduce guesswork and increase consistency across your team.</p>
             </div>
 
             <div className="lp-module-grid">
-              {MODULES.map(({ title, description, icon, badge }) => (
-                <article key={title} className="lp-module-card" style={{ background: '#fff', boxShadow: '0 4px 12px rgba(216, 27, 96, 0.1)' }}>
-                  {badge && <span className="lp-module-badge" style={{ background: '#D81B60', color: '#fff' }}>{badge}</span>}
-                  <div className="lp-module-icon" style={{ color: '#D81B60' }}>
+              {MODULES.map(({ title, description, icon, badge }, index) => (
+                <article
+                  key={title}
+                  className="lp-module-card"
+                  style={{ '--lp-box-bg-image': `url(${SECTION_BOX_BACKGROUNDS[(index + 1) % SECTION_BOX_BACKGROUNDS.length]})` }}
+                >
+                  <div className="lp-box-bg" aria-hidden="true" />
+                  {badge && <span className="lp-module-badge">{badge}</span>}
+                  <div className="lp-module-icon" style={{ color: '#EC6565' }}>
                     {createElement(icon, { size: 20 })}
                   </div>
-                  <h3 style={{ color: '#0f1728' }}>{title}</h3>
-                  <p style={{ color: '#6b7280' }}>{description}</p>
+                  <h3>{title}</h3>
+                  <p>{description}</p>
                 </article>
               ))}
             </div>
@@ -437,14 +461,13 @@ function Landing() {
         </section>
 
         <section
-          className="lp-cta-band df-parallax-surface df-parallax-dark"
-          style={{ backgroundColor: '#fff', color: '#0f1728' }}
+          className="lp-cta-band df-parallax-surface df-parallax-light"
         >
           <div className="container-pro lp-cta-content">
             <div>
-              <span className="lp-kicker" style={{ color: '#D81B60' }}>Ready to deploy?</span>
-              <h2 style={{ color: '#0f1728' }}>Give your grading process a professional standard.</h2>
-              <p style={{ color: '#4f5d73' }}>Sign in to start scanning, benchmarking, and improving every batch.</p>
+              <span className="lp-kicker" style={{ color: '#EC6565' }}>Ready to deploy?</span>
+              <h2>Give your grading process a professional standard.</h2>
+              <p>Sign in to start scanning, benchmarking, and improving every batch.</p>
             </div>
             <Link to="/login" className="lp-btn-primary">
               Go to login

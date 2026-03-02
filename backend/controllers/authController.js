@@ -3,6 +3,11 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { sendEmail } = require('../config/email');
+const {
+  isBlockedAccountStatus,
+  normalizeStatus,
+  getAccountStatusMessage,
+} = require('../utils/accountStatus');
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -120,6 +125,16 @@ const verifyEmail = async (req, res) => {
     user.verificationCodeExpires = undefined;
     
     const updatedUser = await user.save();
+    const status = normalizeStatus(updatedUser.status);
+
+    if (isBlockedAccountStatus(status)) {
+      return res.status(403).json({
+        message: getAccountStatusMessage({
+          status,
+          reason: updatedUser.status_reason,
+        }),
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -156,11 +171,14 @@ const loginUser = async (req, res) => {
     }
 
     if (user && (await user.matchPassword(password))) {
-      const status = (user.status || 'active').toLowerCase();
-      if (status === 'inactive' || status === 'banned') {
-        const reason = (user.status_reason || '').toString().trim();
-        const reasonSuffix = reason ? ` Reason: ${reason}` : '';
-        return res.status(403).json({ message: `Your account is ${status}.${reasonSuffix}` });
+      const status = normalizeStatus(user.status);
+      if (isBlockedAccountStatus(status)) {
+        return res.status(403).json({
+          message: getAccountStatusMessage({
+            status,
+            reason: user.status_reason,
+          }),
+        });
       }
 
       user.last_login_at = new Date();
@@ -230,8 +248,14 @@ const socialLogin = async (req, res) => {
       });
     }
 
-    if (user.status === 'banned') {
-      return res.status(403).json({ message: `Account banned: ${user.status_reason || 'Violation of terms'}` });
+    const status = normalizeStatus(user.status);
+    if (isBlockedAccountStatus(status)) {
+      return res.status(403).json({
+        message: getAccountStatusMessage({
+          status,
+          reason: user.status_reason,
+        }),
+      });
     }
 
     user.last_login_at = new Date();
@@ -255,10 +279,38 @@ const socialLogin = async (req, res) => {
   }
 };
 
+// @desc    Validate active session
+// @route   GET /api/auth/session
+// @access  Private
+const getSessionStatus = async (req, res) => {
+  const status = normalizeStatus(req.user?.status);
+  if (isBlockedAccountStatus(status)) {
+    return res.status(403).json({
+      message: getAccountStatusMessage({
+        status,
+        reason: req.user?.status_reason,
+      }),
+      status,
+      reason: req.user?.status_reason || '',
+    });
+  }
+
+  return res.status(200).json({
+    _id: req.user._id,
+    name: req.user.name,
+    email: req.user.email,
+    avatar: req.user.avatar,
+    role: req.user.role,
+    status,
+    status_reason: req.user.status_reason || '',
+  });
+};
+
 module.exports = {
   registerUser,
   loginUser,
   getMe,
   verifyEmail,
   socialLogin,
+  getSessionStatus,
 };

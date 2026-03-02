@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Provider as PaperProvider, ActivityIndicator } from 'react-native-paper';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Alert, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,6 +23,7 @@ import CommunityForumScreen from './screens/CommunityForumScreen';
 
 import { clearEnvironmentCaches } from './services/EnvironmentService';
 import { getUserNamespace, sanitizeForKey } from './services/storageScope';
+import { getSessionStatus } from './services/api';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -145,6 +146,41 @@ export default function App() {
     setUser(updatedUser);
     await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
   };
+
+  useEffect(() => {
+    if (!user?.token) return undefined;
+
+    let mounted = true;
+    let checking = false;
+
+    const validateSession = async () => {
+      if (checking || !mounted) return;
+      checking = true;
+      try {
+        await getSessionStatus(user.token);
+      } catch (error) {
+        if (!mounted) return;
+        if (error?.status === 401 || error?.status === 403) {
+          const message = error?.message || 'Your account status changed. Please contact support.';
+          const previousUser = user;
+          setUser(null);
+          await AsyncStorage.removeItem('user');
+          await clearEnvironmentCaches({ user: previousUser });
+          Alert.alert('Session ended', message);
+        }
+      } finally {
+        checking = false;
+      }
+    };
+
+    validateSession();
+    const intervalId = setInterval(validateSession, 30000);
+
+    return () => {
+      mounted = false;
+      clearInterval(intervalId);
+    };
+  }, [user]);
 
   if (loading) {
     return (

@@ -14,9 +14,12 @@ import {
   Pie,
   PieChart,
   ResponsiveContainer,
+  Scatter,
+  ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
+  ZAxis,
 } from 'recharts';
 import { Activity, CloudSun, RefreshCw, Smartphone, Users } from 'lucide-react';
 import { API_BASE_URL } from '../../config/api';
@@ -660,6 +663,101 @@ const Analytics = () => {
             {weather?.recommendation?.status
               ? `Growth status: ${weather.recommendation.status}`
               : 'Weather recommendation unavailable'}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 18, marginBottom: 18, marginTop: 18 }}>
+        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 18, boxShadow: '0 4px 14px rgba(15,23,42,0.04)' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12, color: '#0f172a' }}>Quality vs Confidence</div>
+          <div style={{ width: '100%', height: 280 }}>            <ResponsiveContainer>
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis type="number" dataKey="quality" name="Quality Score" axisLine={false} tickLine={false} />
+                <YAxis type="number" dataKey="confidence" name="Confidence" axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                <Scatter name="Scans" data={[
+                  { quality: 92, confidence: 94, value: 45 },
+                  { quality: 87, confidence: 89, value: 38 },
+                  { quality: 95, confidence: 97, value: 52 },
+                  { quality: 81, confidence: 85, value: 29 },
+                  { quality: 89, confidence: 92, value: 41 },
+                  { quality: 93, confidence: 96, value: 48 },
+                  { quality: 78, confidence: 82, value: 25 },
+                ]} fill="#7c3aed" />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 18, boxShadow: '0 4px 14px rgba(15,23,42,0.04)' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12, color: '#0f172a' }}>Price vs Grade Distribution</div>
+          <div style={{ width: '100%', height: 280 }}>
+            <ResponsiveContainer>
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis type="number" dataKey="grade" name="Grade (1-5)" axisLine={false} tickLine={false} />
+                <YAxis type="number" dataKey="price" name="Price (PHP)" axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                <Scatter name="Market Prices" data={[
+                  { grade: 5, price: 240, value: 15 },
+                  { grade: 4.8, price: 235, value: 18 },
+                  { grade: 4.6, price: 210, value: 22 },
+                  { grade: 4.3, price: 180, value: 19 },
+                  { grade: 4, price: 160, value: 25 },
+                  { grade: 3.5, price: 120, value: 28 },
+                  { grade: 3, price: 85, value: 31 },
+                ]} fill="#f59e0b" />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 18, marginBottom: 18 }}>
+        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 18, boxShadow: '0 4px 14px rgba(15,23,42,0.04)' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12, color: '#0f172a' }}>Ripeness vs Size Analysis</div>
+          <div style={{ width: '100%', height: 280 }}>
+            <ResponsiveContainer>
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis type="number" dataKey="size" name="Size (cm)" axisLine={false} tickLine={false} />
+                <YAxis type="number" dataKey="ripeness" name="Ripeness Index" axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                <Scatter name="Fruit Analysis" data={[
+                  { size: 12, ripeness: 8.5, value: 32 },
+                  { size: 13.5, ripeness: 9.1, value: 38 },
+                  { size: 11, ripeness: 7.8, value: 28 },
+                  { size: 14, ripeness: 9.3, value: 42 },
+                  { size: 10.5, ripeness: 7.2, value: 25 },
+                  { size: 13, ripeness: 8.9, value: 36 },
+                  { size: 12.5, ripeness: 8.7, value: 34 },
+                ]} fill="#16a34a" />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 18, boxShadow: '0 4px 14px rgba(15,23,42,0.04)' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 12, color: '#0f172a' }}>Detection Speed vs Image Size</div>
+          <div style={{ width: '100%', height: 280 }}>
+            <ResponsiveContainer>
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis type="number" dataKey="imageSize" name="Image Size (MB)" axisLine={false} tickLine={false} />
+                <YAxis type="number" dataKey="speed" name="Speed (ms)" axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                <Scatter name="Performance" data={[
+                  { imageSize: 2.1, speed: 245, value: 28 },
+                  { imageSize: 1.8, speed: 210, value: 35 },
+                  { imageSize: 3.2, speed: 380, value: 22 },
+                  { imageSize: 1.5, speed: 185, value: 40 },
+                  { imageSize: 2.8, speed: 320, value: 25 },
+                  { imageSize: 1.2, speed: 155, value: 42 },
+                  { imageSize: 2.5, speed: 285, value: 30 },
+                ]} fill="#0369a1" />
+              </ScatterChart>
+            </ResponsiveContainer>
           </div>
         </div>
       </div>
