@@ -3,8 +3,8 @@ const https = require('https');
 const path = require('path');
 
 const url = 'https://ui-avatars.com/api/?name=TS&background=C71585&color=fff&size=1024&font-size=0.5&length=2&bold=true';
-const dest = path.join(__dirname, 'assets', 'icon.png');
-const adaptiveDest = path.join(__dirname, 'assets', 'adaptive-icon.png');
+const dest = path.join(__dirname, 'screens', 'assets', 'icon.png');
+const adaptiveDest = path.join(__dirname, 'screens', 'assets', 'adaptive-icon.png');
 
 console.log('Downloading icon from:', url);
 console.log('Saving to:', dest);

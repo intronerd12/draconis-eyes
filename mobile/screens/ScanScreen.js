@@ -12,6 +12,16 @@ import * as ImagePicker from 'expo-image-picker';
 
 const { width, height } = Dimensions.get('window');
 
+const getGradeColor = (grade) => {
+  const value = String(grade || 'N/A').toUpperCase();
+  if (value === 'A') return '#4CAF50';
+  if (value === 'B') return '#8BC34A';
+  if (value === 'C') return '#FF9800';
+  if (value === 'D') return '#EF5350';
+  if (value === 'E') return '#D32F2F';
+  return '#90A4AE';
+};
+
 export default function ScanScreen({ user }) {
   const navigation = useNavigation();
   const tabBarHeight = useBottomTabBarHeight();
@@ -274,7 +284,9 @@ export default function ScanScreen({ user }) {
       scanResult.insect_risk_level
         ? `${String(scanResult.insect_risk_level)} (${insectRiskScore === '--' ? '0%' : insectRiskScore})`
         : '--';
-    const displayGrade = isNoFruit ? 'No grade' : (scanResult.grade || '--');
+    const normalizedGrade = String(scanResult.grade || 'N/A').toUpperCase();
+    const displayGrade = isNoFruit ? 'No grade' : normalizedGrade;
+    const gradeColor = isNoFruit ? '#90A4AE' : getGradeColor(normalizedGrade);
     const displayFruitType = isNoFruit ? 'No dragon fruit detected' : (scanResult.fruit_type || '--');
     const displayNotes = isNoFruit ? 'No results.' : (scanResult.notes || '--');
     const resultBottomPadding = Math.max(tabBarHeight + 36, 130);
@@ -341,18 +353,7 @@ export default function ScanScreen({ user }) {
                     style={[
                       styles.gradeValue,
                       {
-                        color:
-                          displayGrade === 'A'
-                            ? '#4CAF50'
-                            : displayGrade === 'B'
-                              ? '#8BC34A'
-                              : displayGrade === 'C'
-                                ? '#FF9800'
-                                : displayGrade === 'D'
-                                  ? '#EF5350'
-                                  : displayGrade === 'E'
-                                    ? '#D32F2F'
-                                : '#B0BEC5',
+                        color: gradeColor,
                       },
                     ]}
                   >
@@ -467,7 +468,7 @@ export default function ScanScreen({ user }) {
             <Card.Content>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Grade:</Text>
-                <Text style={styles.detailValue}>{scanResult.grade || '--'}</Text>
+                <Text style={styles.detailValue}>{normalizedGrade}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Size Category:</Text>
