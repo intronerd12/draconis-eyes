@@ -20,7 +20,7 @@ function MarketingFooter() {
       <div className="container-pro lp-footer-grid">
         <div className="lp-footer-brand">
           <div className="lp-brand">
-            <BrandMark size={34} />
+            <BrandMark size={34} variant="tropiscan" />
             <div className="lp-brand-copy">
               <span className="lp-brand-name">{BRAND_NAME}</span>
               <span className="lp-brand-tag">{BRAND_TAGLINE}</span>

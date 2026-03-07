@@ -51,6 +51,33 @@ const scanSchema = mongoose.Schema(
       trim: true,
       default: 'unknown',
     },
+    estimated_price_per_kg: {
+      type: Number,
+    },
+    fruit_area_ratio: {
+      type: Number,
+    },
+    size_category: {
+      type: String,
+      trim: true,
+    },
+    market_value_label: {
+      type: String,
+      trim: true,
+    },
+    weight_grams_est: {
+      type: Number,
+    },
+    ripeness_score: {
+      type: Number,
+    },
+    quality_score: {
+      type: Number,
+    },
+    shelf_life_label: {
+      type: String,
+      trim: true,
+    },
   },
   {
     timestamps: true,

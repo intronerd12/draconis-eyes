@@ -74,6 +74,114 @@ const resolveUserMeta = (user) => {
   };
 };
 
+const normalizeComparable = (value) => String(value ?? '').trim().toLowerCase();
+
+const belongsToUser = (scan, userMeta) => {
+  const rowUserId = String(scan?.user?._id ?? scan?.user ?? scan?.userId ?? scan?.user_id ?? '').trim();
+  const rowEmail = normalizeComparable(scan?.operatorEmail ?? scan?.email ?? scan?.user?.email);
+  const rowName = normalizeComparable(scan?.operatorName ?? scan?.user?.name);
+
+  if (userMeta?.userId && rowUserId) {
+    return rowUserId === String(userMeta.userId);
+  }
+
+  if (userMeta?.userEmail && rowEmail) {
+    return rowEmail === normalizeComparable(userMeta.userEmail);
+  }
+
+  if (userMeta?.userName && rowName) {
+    return rowName === normalizeComparable(userMeta.userName);
+  }
+
+  return false;
+};
+
+const normalizeRemoteScan = (scan, index = 0) => {
+  const normalizedId =
+    String(scan?.localScanId ?? scan?._id ?? scan?.id ?? `remote-${Date.now()}-${index}`).trim();
+
+  return {
+    id: normalizedId,
+    localScanId: String(scan?.localScanId ?? normalizedId).trim(),
+    timestamp: scan?.timestamp || scan?.createdAt || new Date().toISOString(),
+    imageUri: String(scan?.imageUrl ?? scan?.imageUri ?? '').trim(),
+    grade: String(scan?.grade ?? 'N/A').toUpperCase(),
+    notes: String(scan?.details ?? scan?.notes ?? '').trim(),
+    fruit_type: String(scan?.fruitType ?? scan?.fruit_type ?? 'Dragon Fruit').trim(),
+    estimated_price_per_kg: toFiniteNumber(scan?.estimated_price_per_kg ?? scan?.estimatedPricePerKg, 0),
+    fruit_area_ratio: toFiniteNumber(scan?.fruit_area_ratio ?? scan?.fruitAreaRatio, 0),
+    size_category: String(scan?.size_category ?? scan?.sizeCategory ?? 'N/A').trim() || 'N/A',
+    market_value_label: String(scan?.market_value_label ?? scan?.marketValueLabel ?? 'N/A').trim() || 'N/A',
+    weight_grams_est: Math.round(toFiniteNumber(scan?.weight_grams_est ?? scan?.weightGramsEst, 0)),
+    shelf_life_label: String(scan?.shelf_life_label ?? scan?.shelfLifeLabel ?? 'No result').trim() || 'No result',
+    ripeness_score: Math.round(toFiniteNumber(scan?.ripeness_score ?? scan?.ripenessScore, 0)),
+    quality_score: Math.round(toFiniteNumber(scan?.quality_score ?? scan?.qualityScore, 0)),
+    location: scan?.location ?? null,
+    source: String(scan?.source ?? 'web_app').trim() || 'web_app',
+  };
+};
+
+const mergeScans = (localScans, remoteScans) => {
+  const merged = new Map();
+
+  const upsert = (scan) => {
+    const key = String(scan?.localScanId || scan?.id || '').trim() || `${scan?.timestamp || ''}-${merged.size}`;
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, scan);
+      return;
+    }
+
+    const preferredImage =
+      (typeof existing?.imageUri === 'string' && existing.imageUri.startsWith('file') && existing.imageUri) ||
+      scan?.imageUri ||
+      existing?.imageUri;
+
+    merged.set(key, {
+      ...existing,
+      ...scan,
+      id: existing?.id || scan?.id || key,
+      localScanId: existing?.localScanId || scan?.localScanId || key,
+      imageUri: preferredImage || '',
+    });
+  };
+
+  remoteScans.forEach(upsert);
+  localScans.forEach(upsert);
+
+  return Array.from(merged.values()).sort(
+    (a, b) => new Date(b?.timestamp || 0).getTime() - new Date(a?.timestamp || 0).getTime()
+  );
+};
+
+const fetchRemoteScans = async ({ user } = {}) => {
+  const userMeta = resolveUserMeta(user);
+  if (!userMeta.userId && !userMeta.userEmail && !userMeta.userName) {
+    return [];
+  }
+
+  const headers = { Accept: 'application/json' };
+  if (userMeta.token) {
+    headers.Authorization = `Bearer ${userMeta.token}`;
+  }
+
+  try {
+    const res = await apiFetch('/api/scan', { headers, cache: 'no-store' });
+    if (!res.ok) {
+      return [];
+    }
+    const payload = await safeReadJson(res);
+    if (!Array.isArray(payload)) return [];
+
+    return payload
+      .filter((scan) => belongsToUser(scan, userMeta))
+      .slice(0, MAX_SCANS_STORED)
+      .map((scan, index) => normalizeRemoteScan(scan, index));
+  } catch {
+    return [];
+  }
+};
+
 const getUploadMeta = (imageUri) => {
   const uriStr = String(imageUri || '');
   const cleanUri = uriStr.split('?')[0];
@@ -143,6 +251,7 @@ const sanitizeScanForStorage = (scan) => {
 
   return {
     id: scan.id,
+    localScanId: scan.localScanId || scan.id,
     timestamp: scan.timestamp,
     imageUri: scan.imageUri,
     grade: scan.grade,
@@ -163,6 +272,7 @@ const sanitizeScanForStorage = (scan) => {
     harvest_stage: scan.harvest_stage || 'No result',
     recommendations,
     location: scan.location || null,
+    source: scan.source || 'mobile_app',
   };
 };
 
@@ -258,6 +368,36 @@ const deleteScanFromBackend = async (localScanId, { user } = {}) => {
   if (!res.ok) {
     const errorBody = await safeReadJson(res);
     throw new Error(errorBody?.message || `Scan delete sync failed (${res.status})`);
+  }
+
+  return safeReadJson(res);
+};
+
+const deleteAllScansFromBackend = async ({ user, source } = {}) => {
+  const { userId, userEmail, token } = resolveUserMeta(user);
+  if (!userId && !userEmail) {
+    return null;
+  }
+
+  const query = new URLSearchParams();
+  if (userId) query.set('userId', userId);
+  if (userEmail) query.set('operatorEmail', userEmail);
+  if (source) query.set('source', String(source));
+  const queryString = query.toString();
+
+  const headers = { Accept: 'application/json' };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const res = await apiFetch(`/api/scan${queryString ? `?${queryString}` : ''}`, {
+    method: 'DELETE',
+    headers,
+  });
+
+  if (!res.ok) {
+    const errorBody = await safeReadJson(res);
+    throw new Error(errorBody?.message || `Bulk scan delete failed (${res.status})`);
   }
 
   return safeReadJson(res);
@@ -411,7 +551,8 @@ export const ScanService = {
       const jsonValue = await AsyncStorage.getItem(getStorageKey(user));
       void ScanService.flushPendingSync({ user });
       const parsed = jsonValue != null ? safeParseArray(jsonValue) : [];
-      if (!parsed.length) return [];
+      const remoteScans = await fetchRemoteScans({ user });
+      if (!parsed.length && !remoteScans.length) return [];
 
       const needsCompaction = parsed.some(
         (scan) =>
@@ -422,12 +563,12 @@ export const ScanService = {
             Array.isArray(scan.disease_detections))
       );
 
+      let localScans = parsed;
       if (needsCompaction || parsed.length > MAX_SCANS_STORED) {
-        const compacted = await persistScans(parsed, user);
-        return compacted;
+        localScans = await persistScans(parsed, user);
       }
 
-      return parsed;
+      return mergeScans(localScans, remoteScans);
     } catch (e) {
       console.error('Error reading scans', e);
       if (isStorageOverflowError(e)) {
@@ -555,6 +696,36 @@ export const ScanService = {
       return { deleted: idx >= 0 };
     } catch (e) {
       console.error('Error deleting scan', e);
+      throw e;
+    }
+  },
+
+  deleteAllScans: async ({ user, source } = {}) => {
+    try {
+      const raw = await AsyncStorage.getItem(getStorageKey(user));
+      const localScans = safeParseArray(raw);
+
+      await deleteAllScansFromBackend({ user, source });
+
+      await AsyncStorage.removeItem(getStorageKey(user));
+      await AsyncStorage.removeItem(getPendingKey(user));
+
+      const localImageUris = localScans
+        .map((scan) => String(scan?.imageUri || ''))
+        .filter((uri) => uri.startsWith('file:'));
+
+      for (const uri of localImageUris) {
+        try {
+          const info = await FileSystem.getInfoAsync(uri);
+          if (info.exists) {
+            await FileSystem.deleteAsync(uri, { idempotent: true });
+          }
+        } catch {}
+      }
+
+      return { deleted: true };
+    } catch (e) {
+      console.error('Error deleting all scans', e);
       throw e;
     }
   },

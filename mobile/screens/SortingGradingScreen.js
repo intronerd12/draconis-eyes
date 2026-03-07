@@ -13,6 +13,7 @@ export default function SortingGradingScreen({ user }) {
   const [sortBy, setSortBy] = useState('newest');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteVisible, setDeleteVisible] = useState(false);
+  const [deleteAllVisible, setDeleteAllVisible] = useState(false);
 
   const refresh = useCallback(async () => {
     const list = await ScanService.getScans({ user });
@@ -68,6 +69,16 @@ export default function SortingGradingScreen({ user }) {
     }
   };
 
+  const confirmDeleteAll = async () => {
+    setDeleteAllVisible(false);
+    try {
+      await ScanService.deleteAllScans({ user });
+      await refresh();
+    } catch {
+      await refresh();
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -87,6 +98,19 @@ export default function SortingGradingScreen({ user }) {
           <Dialog.Actions style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
             <Button onPress={() => setDeleteVisible(false)} textColor="#666">Cancel</Button>
             <Button onPress={confirmDelete} textColor="#C71585">Delete</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        <Dialog visible={deleteAllVisible} onDismiss={() => setDeleteAllVisible(false)} style={{ backgroundColor: 'white' }}>
+          <Dialog.Title style={{ color: '#111' }}>Delete all scans?</Dialog.Title>
+          <Dialog.Content>
+            <Paragraph style={{ color: '#555' }}>
+              This removes all scan history for your account from this device and synced backend data.
+            </Paragraph>
+          </Dialog.Content>
+          <Dialog.Actions style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
+            <Button onPress={() => setDeleteAllVisible(false)} textColor="#666">Cancel</Button>
+            <Button onPress={confirmDeleteAll} textColor="#C71585">Delete All</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -137,6 +161,18 @@ export default function SortingGradingScreen({ user }) {
               >
                 Highest Price
               </Chip>
+            </View>
+
+            <Divider style={styles.divider} />
+            <View style={styles.deleteAllWrap}>
+              <Button
+                mode="outlined"
+                onPress={() => setDeleteAllVisible(true)}
+                textColor="#C71585"
+                style={styles.deleteAllBtn}
+              >
+                Delete All History
+              </Button>
             </View>
           </Card.Content>
         </Card>
@@ -247,6 +283,12 @@ const styles = StyleSheet.create({
   },
   divider: {
     marginVertical: 14,
+  },
+  deleteAllWrap: {
+    alignItems: 'flex-end',
+  },
+  deleteAllBtn: {
+    borderColor: 'rgba(199, 21, 133, 0.38)',
   },
   itemCard: {
     borderRadius: 16,

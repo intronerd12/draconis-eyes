@@ -13,6 +13,28 @@ const normalizeGrade = (value) => {
   return cleaned ? cleaned.toUpperCase() : 'UNKNOWN';
 };
 
+const normalizeNumber = (value) => {
+  if (value === undefined || value === null || value === '') return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+const buildOwnerScope = (queryParams = {}) => {
+  const rawOperatorEmail = normalizeText(queryParams?.operatorEmail);
+  const rawUserId = normalizeText(queryParams?.userId);
+  const operatorEmail = rawOperatorEmail ? rawOperatorEmail.toLowerCase() : null;
+
+  const scope = {};
+  if (operatorEmail) {
+    scope.operatorEmail = operatorEmail;
+  }
+  if (rawUserId && mongoose.Types.ObjectId.isValid(rawUserId)) {
+    scope.user = rawUserId;
+  }
+
+  return scope;
+};
+
 // @desc    Get all scans
 // @route   GET /api/scans
 // @access  Private (Admin) or Public (depending on requirements)
@@ -42,6 +64,22 @@ const createScan = async (req, res) => {
       fruitType,
       localScanId,
       source,
+      estimated_price_per_kg,
+      estimatedPricePerKg,
+      fruit_area_ratio,
+      fruitAreaRatio,
+      size_category,
+      sizeCategory,
+      market_value_label,
+      marketValueLabel,
+      weight_grams_est,
+      weightGramsEst,
+      ripeness_score,
+      ripenessScore,
+      quality_score,
+      qualityScore,
+      shelf_life_label,
+      shelfLifeLabel,
     } = req.body;
 
     const normalizedEmail = normalizeText(operatorEmail)?.toLowerCase();
@@ -71,6 +109,14 @@ const createScan = async (req, res) => {
       fruitType: normalizeText(fruitType),
       localScanId: normalizedLocalScanId,
       source: normalizeText(source) || 'mobile_app',
+      estimated_price_per_kg: normalizeNumber(estimated_price_per_kg ?? estimatedPricePerKg),
+      fruit_area_ratio: normalizeNumber(fruit_area_ratio ?? fruitAreaRatio),
+      size_category: normalizeText(size_category ?? sizeCategory),
+      market_value_label: normalizeText(market_value_label ?? marketValueLabel),
+      weight_grams_est: normalizeNumber(weight_grams_est ?? weightGramsEst),
+      ripeness_score: normalizeNumber(ripeness_score ?? ripenessScore),
+      quality_score: normalizeNumber(quality_score ?? qualityScore),
+      shelf_life_label: normalizeText(shelf_life_label ?? shelfLifeLabel),
     };
 
     if (resolvedUser?._id) {
@@ -112,20 +158,24 @@ const createScan = async (req, res) => {
 // @access  Private (User)
 const deleteScanByLocalScanId = async (req, res) => {
   try {
-    const localScanId = normalizeText(req.params.localScanId);
-    if (!localScanId) {
+    const scanIdentifier = normalizeText(req.params.localScanId);
+    if (!scanIdentifier) {
       return res.status(400).json({ message: 'localScanId is required' });
     }
 
-    const rawOperatorEmail = normalizeText(req.query?.operatorEmail);
-    const rawUserId = normalizeText(req.query?.userId);
-    const operatorEmail = rawOperatorEmail ? rawOperatorEmail.toLowerCase() : null;
+    const ownerScope = buildOwnerScope(req.query);
+    if (!Object.keys(ownerScope).length) {
+      return res.status(400).json({ message: 'userId or operatorEmail is required' });
+    }
 
-    const query = { localScanId };
-    if (operatorEmail) {
-      query.operatorEmail = operatorEmail;
-    } else if (rawUserId && mongoose.Types.ObjectId.isValid(rawUserId)) {
-      query.user = rawUserId;
+    const query = { ...ownerScope };
+    if (mongoose.Types.ObjectId.isValid(scanIdentifier)) {
+      query.$or = [
+        { localScanId: scanIdentifier },
+        { _id: scanIdentifier },
+      ];
+    } else {
+      query.localScanId = scanIdentifier;
     }
 
     const deleted = await Scan.findOneAndDelete(query);
@@ -134,6 +184,32 @@ const deleteScanByLocalScanId = async (req, res) => {
     }
 
     return res.status(200).json({ message: 'Scan deleted', id: deleted._id });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Delete all scans for a user
+// @route   DELETE /api/scan
+// @access  Private (User)
+const deleteAllScansForUser = async (req, res) => {
+  try {
+    const ownerScope = buildOwnerScope(req.query);
+    if (!Object.keys(ownerScope).length) {
+      return res.status(400).json({ message: 'userId or operatorEmail is required' });
+    }
+
+    const source = normalizeText(req.query?.source);
+    const query = { ...ownerScope };
+    if (source) {
+      query.source = source;
+    }
+
+    const result = await Scan.deleteMany(query);
+    return res.status(200).json({
+      message: 'Scans deleted',
+      deletedCount: Number(result?.deletedCount || 0),
+    });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -405,6 +481,7 @@ module.exports = {
   getScans,
   createScan,
   deleteScanByLocalScanId,
+  deleteAllScansForUser,
   getScanStats,
   getScanAnalytics,
 };

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import SystemStatus from '../components/SystemStatus'
 import ParallaxDatasetSection from '../components/marketing/ParallaxDatasetSection'
+import UserHeader from '../components/user/UserHeader'
 import { BRAND_NAME } from '../config/brand'
 import { API_BASE_URL } from '../config/api'
 import '../App.css'
@@ -54,7 +55,9 @@ function Home() {
   const sections = [
     { id: 'overview', title: 'Overview', path: '/overview', icon: '01', desc: 'System overview and introduction' },
     { id: 'analyze', title: 'AI Analysis', path: '/ai-analysis', icon: '02', desc: 'Upload and analyze fruit images' },
-    { id: 'community', title: 'Community Forum', path: '/community', icon: '03', desc: 'Share and discuss scan results with other users' },
+    { id: 'sorting', title: 'Sorting & Grading', path: '/sorting-grading', icon: '03', desc: 'Review past analysis results and grading history' },
+    { id: 'environment', title: 'Environment', path: '/environment', icon: '04', desc: 'Track Philippine dragonfruit plantation locations and abundance' },
+    { id: 'community', title: 'Community Forum', path: '/community', icon: '05', desc: 'Share and discuss scan results with other users' },
   ]
   const dashboardWallpapers = Array.from({ length: 6 }, () => ({
     src: '/wallpaper-dragon/wallpaper-10.jpg',
@@ -63,16 +66,9 @@ function Home() {
 
   return (
     <div className="app-shell">
-      <header>
-        <div className="container-pro">
-          <div className="logo-section">
-            <span className="logo-text">{BRAND_NAME}</span>
-          </div>
-          <nav>
-            {sections.map((section) => (
-              <a key={section.id} href={section.path} className="nav-link">{section.title}</a>
-            ))}
-          </nav>
+      <UserHeader
+        showDashboardLink={false}
+        rightSlot={
           <div className="header-right">
             <div className="status-info">
               <span className="status-label">System Status</span>
@@ -81,20 +77,34 @@ function Home() {
               </span>
             </div>
             {user && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid #e5e7eb', paddingLeft: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid #e5e7eb', paddingLeft: '12px' }}>
                 <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: '0.9rem', fontWeight: '600', color: '#111827' }}>{user.name || 'User'}</span>
                   <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{user.email}</span>
                 </div>
                 {user.avatar ? (
-                  <img 
-                    src={user.avatar} 
-                    alt={user.name} 
+                  <img
+                    src={user.avatar}
+                    alt={user.name}
                     style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
                   />
                 ) : (
-                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e5e7eb' }}>
-                    <span style={{ fontSize: '1.2rem' }}>👤</span>
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '50%',
+                      backgroundColor: '#f3f4f6',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '1px solid #e5e7eb',
+                      color: '#334155',
+                      fontWeight: 700,
+                      fontSize: '0.95rem',
+                    }}
+                  >
+                    {String(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
                   </div>
                 )}
               </div>
@@ -102,13 +112,13 @@ function Home() {
             <button
               onClick={handleLogout}
               className="btn-outline"
-              style={{ marginLeft: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}
+              style={{ marginLeft: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}
             >
               <span>Logout</span>
             </button>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       <main style={{ background: 'linear-gradient(135deg, #fdf2f8 0%, #f5f0ff 100%)' }}>
         <section

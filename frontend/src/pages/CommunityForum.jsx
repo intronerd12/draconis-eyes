@@ -3,13 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { API_BASE_URL } from '../config/api'
 import { BRAND_NAME } from '../config/brand'
+import UserHeader from '../components/user/UserHeader'
 import './Landing.css'
-
-const NAV_ITEMS = [
-  { path: '/overview', label: 'Overview', icon: 'Home' },
-  { path: '/ai-analysis', label: 'AI Analysis', icon: 'Scan' },
-  { path: '/community', label: 'Community', icon: 'Forum' },
-]
 
 const asText = (value, fallback = '') => {
   const text = String(value ?? '').trim()
@@ -516,60 +511,7 @@ function CommunityForum() {
 
   return (
     <div className="app-shell" style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #fff6fb 0%, #f8fbff 100%)' }}>
-      <header
-        style={{
-          backdropFilter: 'blur(14px)',
-          background: 'rgba(255, 255, 255, 0.92)',
-          borderBottom: '1px solid rgba(16, 25, 39, 0.08)',
-          padding: '16px 0',
-          position: 'sticky',
-          top: 0,
-          zIndex: 40,
-        }}
-      >
-        <div className="container-pro" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '24px' }}>
-          <Link to="/home" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <div style={{ fontSize: '1.3rem', fontWeight: '700' }}>TropiScan</div>
-          </Link>
-          <nav style={{ display: 'flex', gap: '28px', flex: 1, alignItems: 'center' }}>
-            {NAV_ITEMS.map((item) => {
-              const isActive = window.location.pathname === item.path
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  style={{
-                    textDecoration: 'none',
-                    color: isActive ? '#D81B60' : '#6b7280',
-                    fontWeight: isActive ? '700' : '500',
-                    fontSize: '0.95rem',
-                    paddingBottom: '4px',
-                    borderBottom: isActive ? '2px solid #D81B60' : 'none',
-                  }}
-                >
-                  {item.label}
-                </Link>
-              )
-            })}
-          </nav>
-          <Link
-            to="/home"
-            style={{
-              padding: '8px 16px',
-              background: '#f5f5f5',
-              border: '1px solid #ddd',
-              borderRadius: '6px',
-              fontSize: '0.9rem',
-              fontWeight: '500',
-              textDecoration: 'none',
-              color: '#000',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Dashboard
-          </Link>
-        </div>
-      </header>
+      <UserHeader />
 
       <main>
         <section className="lp-section">

@@ -2,13 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { API_BASE_URL } from '../config/api'
 import { BRAND_NAME } from '../config/brand'
+import UserHeader from '../components/user/UserHeader'
 import './Landing.css'
 
-const NAV_ITEMS = [
-  { path: '/overview', label: 'Overview', icon: '🏠' },
-  { path: '/ai-analysis', label: 'AI Analysis', icon: '🧪' },
-  { path: '/community', label: 'Community', icon: '👥' },
-]
+const WEB_SCAN_HISTORY_KEY = 'web_scan_history_v1'
+const MAX_LOCAL_WEB_HISTORY = 36
 
 const toPercent = (value) => {
   const n = Number(value)
@@ -40,6 +38,74 @@ const parseUserMeta = () => {
     }
   } catch {
     return {}
+  }
+}
+
+const createCompressedDataUrl = (file, maxSide = 900, quality = 0.76) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const image = new Image()
+      image.onload = () => {
+        const width = Number(image.width || 0)
+        const height = Number(image.height || 0)
+        const largest = Math.max(width, height, 1)
+        const scale = largest > maxSide ? maxSide / largest : 1
+        const targetWidth = Math.max(1, Math.round(width * scale))
+        const targetHeight = Math.max(1, Math.round(height * scale))
+        const canvas = document.createElement('canvas')
+        canvas.width = targetWidth
+        canvas.height = targetHeight
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          resolve('')
+          return
+        }
+        ctx.drawImage(image, 0, 0, targetWidth, targetHeight)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      image.onerror = () => reject(new Error('Failed to load image preview'))
+      image.src = String(reader.result || '')
+    }
+    reader.onerror = () => reject(new Error('Failed to read image file'))
+    reader.readAsDataURL(file)
+  })
+
+const appendWebScanHistory = async ({ file, result, userMeta, localScanId, imageUrl }) => {
+  try {
+    if (!file) return
+
+    const previewUrl = imageUrl || (await createCompressedDataUrl(file).catch(() => ''))
+    const entry = {
+      id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      localScanId,
+      source: 'web_app',
+      timestamp: new Date().toISOString(),
+      userId: userMeta?.userId,
+      operatorEmail: userMeta?.userEmail,
+      operatorName: userMeta?.userName,
+      grade: String(result?.grade || 'N/A').toUpperCase(),
+      details: result?.notes || result?.shelf_life_label || 'AI web analysis',
+      fruitType: result?.fruit_type || result?.fruitType || 'Dragon Fruit',
+      imageUrl: previewUrl,
+      estimated_price_per_kg: Number(result?.estimated_price_per_kg || 0) || 0,
+      fruit_area_ratio: Number(result?.fruit_area_ratio || 0) || 0,
+      size_category: result?.size_category || 'N/A',
+      market_value_label: result?.market_value_label || 'N/A',
+      weight_grams_est: Number(result?.weight_grams_est || 0) || 0,
+      ripeness_score: Number(result?.ripeness_score || 0) || 0,
+      quality_score: Number(result?.quality_score || 0) || 0,
+      shelf_life_label: result?.shelf_life_label || 'No result',
+    }
+
+    const rawHistory = localStorage.getItem(WEB_SCAN_HISTORY_KEY)
+    const parsed = rawHistory ? JSON.parse(rawHistory) : []
+    const history = Array.isArray(parsed) ? parsed : []
+    const withoutDuplicate = history.filter((item) => String(item?.localScanId || '') !== String(localScanId))
+    const next = [entry, ...withoutDuplicate].slice(0, MAX_LOCAL_WEB_HISTORY)
+    localStorage.setItem(WEB_SCAN_HISTORY_KEY, JSON.stringify(next))
+  } catch {
+    // Keep analysis successful even if local history sync fails.
   }
 }
 
@@ -82,30 +148,52 @@ function AiAnalysis() {
         throw new Error(data?.message || data?.detail || 'Analysis failed')
       }
 
+      const scanTimestamp = new Date().toISOString()
+      const localScanId = `web-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const userMeta = parseUserMeta()
+      const previewImageUrl = await createCompressedDataUrl(file, 640, 0.72).catch(() => '')
       setAnalysisResult(data)
       localStorage.setItem(
         'latest_web_scan_result',
         JSON.stringify({
           ...data,
-          createdAt: new Date().toISOString(),
+          createdAt: scanTimestamp,
+          localScanId,
+          imageUrl: previewImageUrl,
         })
       )
+
+      void appendWebScanHistory({
+        file,
+        result: data,
+        userMeta,
+        localScanId,
+        imageUrl: previewImageUrl,
+      })
+
       try {
-        const { userId, userName, userEmail } = parseUserMeta()
         await fetch(`${API_BASE_URL}/api/scan`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             grade: String(data?.grade || 'UNKNOWN').toUpperCase(),
             details: data?.notes || data?.shelf_life_label || 'AI web analysis',
-            imageUrl: '',
-            timestamp: new Date().toISOString(),
-            userId,
-            operatorName: userName,
-            operatorEmail: userEmail,
+            imageUrl: previewImageUrl || '',
+            timestamp: scanTimestamp,
+            userId: userMeta?.userId,
+            operatorName: userMeta?.userName,
+            operatorEmail: userMeta?.userEmail,
             fruitType: data?.fruit_type || data?.fruitType || 'Dragon Fruit',
-            localScanId: `web-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            localScanId,
             source: 'web_app',
+            estimated_price_per_kg: Number(data?.estimated_price_per_kg || 0) || 0,
+            fruit_area_ratio: Number(data?.fruit_area_ratio || 0) || 0,
+            size_category: data?.size_category || 'N/A',
+            market_value_label: data?.market_value_label || 'N/A',
+            weight_grams_est: Number(data?.weight_grams_est || 0) || 0,
+            ripeness_score: Number(data?.ripeness_score || 0) || 0,
+            quality_score: Number(data?.quality_score || 0) || 0,
+            shelf_life_label: data?.shelf_life_label || 'No result',
           }),
         })
       } catch {
@@ -121,67 +209,7 @@ function AiAnalysis() {
 
   return (
     <div className="app-shell" style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #fdf4f9 0%, #f3f7ff 60%, #eefbf7 100%)' }}>
-      <header
-        style={{
-          background: '#fff',
-          borderBottom: '1px solid #f0f0f0',
-          padding: '16px 0',
-          position: 'sticky',
-          top: 0,
-          zIndex: 40,
-        }}
-      >
-        <div className="container-pro" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '28px' }}>
-          <a href="/home" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <div style={{ fontSize: '1.3rem', fontWeight: '700' }}>🌴 {BRAND_NAME}</div>
-          </a>
-
-          <nav style={{ display: 'flex', gap: '32px', flex: 1, alignItems: 'center' }}>
-            {NAV_ITEMS.map((item) => {
-              const isActive = window.location.pathname === item.path
-              return (
-                <a
-                  key={item.path}
-                  href={item.path}
-                  style={{
-                    textDecoration: 'none',
-                    color: isActive ? '#D81B60' : '#6b7280',
-                    fontWeight: isActive ? '700' : '500',
-                    fontSize: '0.95rem',
-                    paddingBottom: '4px',
-                    borderBottom: isActive ? '2px solid #D81B60' : 'none',
-                    transition: 'all 0.2s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                  }}
-                >
-                  <span>{item.icon}</span>
-                  {item.label}
-                </a>
-              )
-            })}
-          </nav>
-
-          <a
-            href="/home"
-            style={{
-              padding: '8px 16px',
-              background: '#f5f5f5',
-              border: '1px solid #ddd',
-              borderRadius: '6px',
-              fontSize: '0.9rem',
-              fontWeight: '500',
-              textDecoration: 'none',
-              color: '#000',
-              transition: 'all 0.2s ease',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            ← Dashboard
-          </a>
-        </div>
-      </header>
+      <UserHeader />
 
       <main>
         <section className="lp-section" style={{ paddingTop: '24px' }}>

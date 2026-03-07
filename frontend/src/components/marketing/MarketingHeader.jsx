@@ -15,7 +15,7 @@ function MarketingHeader() {
     <div className="lp-header-wrap">
       <div className="container-pro lp-header lp-header-marketing">
         <Link to="/" className="lp-brand" aria-label={`${BRAND_NAME} home`}>
-          <BrandMark size={38} />
+          <BrandMark size={38} variant="tropiscan" />
           <div className="lp-brand-copy">
             <span className="lp-brand-name">{BRAND_NAME}</span>
             <span className="lp-brand-tag">{BRAND_TAGLINE}</span>

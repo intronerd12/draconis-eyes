@@ -1,6 +1,7 @@
 import React from 'react'
 import { BRAND_NAME } from '../config/brand'
 import { WALLPAPER_DRAGON_IMAGES } from '../config/wallpaperDragon'
+import UserHeader from '../components/user/UserHeader'
 import './Landing.css'
 
 function Overview() {
@@ -24,65 +25,7 @@ function Overview() {
 
   return (
     <div className="app-shell">
-      {/* HEADER */}
-      <header style={{
-        background: '#fff',
-        borderBottom: '1px solid #f0f0f0',
-        padding: '16px 0',
-        position: 'sticky',
-        top: 0,
-        zIndex: 40
-      }}>
-        <div className="container-pro" style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '32px'
-        }}>
-          <a href="/home" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <div style={{ fontSize: '1.3rem', fontWeight: '700' }}>🌴 {BRAND_NAME}</div>
-          </a>
-          <nav style={{ display: 'flex', gap: '32px', flex: 1, alignItems: 'center' }}>
-            {[
-              { path: '/overview', label: 'Overview', icon: '🏠' },
-              { path: '/ai-analysis', label: 'AI Analysis', icon: '🧪' },
-              { path: '/community', label: 'Community', icon: '👥' }
-            ].map(item => {
-              const isActive = window.location.pathname === item.path
-              return (
-                <a key={item.path} href={item.path} style={{
-                  textDecoration: 'none',
-                  color: isActive ? '#D81B60' : '#6b7280',
-                  fontWeight: isActive ? '700' : '500',
-                  fontSize: '0.95rem',
-                  paddingBottom: '4px',
-                  borderBottom: isActive ? '2px solid #D81B60' : 'none',
-                  transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}>
-                  <span>{item.icon}</span>
-                  {item.label}
-                </a>
-              )
-            })}
-          </nav>
-          <a href="/home" style={{
-            padding: '8px 16px',
-            background: '#f5f5f5',
-            border: '1px solid #ddd',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '0.9rem',
-            fontWeight: '500',
-            textDecoration: 'none',
-            color: '#000',
-            transition: 'all 0.2s ease',
-            whiteSpace: 'nowrap'
-          }}>← Dashboard</a>
-        </div>
-      </header>
+      <UserHeader />
 
         {/* HERO */}
       <main>
@@ -274,12 +217,12 @@ function Overview() {
         marginTop: '48px'
       }}>
         <div className="container-pro" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '1.3rem', fontWeight: '700', marginBottom: '12px', color: '#fff' }}>🌴 {BRAND_NAME}</div>
+          <div style={{ fontSize: '1.3rem', fontWeight: '700', marginBottom: '12px', color: '#fff' }}>{BRAND_NAME}</div>
           <p style={{ color: 'rgba(255, 255, 255, 0.9)', margin: '0 0 12px 0' }}>
             Intelligent Dragon Fruit Detection & Quality Control
           </p>
           <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.9rem' }}>
-            © {new Date().getFullYear()} {BRAND_NAME}. All rights reserved.
+            � {new Date().getFullYear()} {BRAND_NAME}. All rights reserved.
           </div>
         </div>
       </footer>

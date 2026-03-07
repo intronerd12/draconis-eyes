@@ -10,7 +10,9 @@ import Home from './pages/Home'
 import Auth from './pages/AuthPro'
 import Overview from './pages/Overview'
 import AiAnalysis from './pages/AiAnalysis'
+import SortingGrading from './pages/SortingGrading'
 import CommunityForum from './pages/CommunityForum'
+import Environment from './pages/Environment'
 import AdminLayout from './components/admin/AdminLayout'
 import Dashboard from './pages/admin/Dashboard'
 import AdminFeatures from './pages/admin/AdminFeatures'
@@ -20,7 +22,6 @@ import UserManagement from './pages/admin/UserManagement'
 import Analytics from './pages/admin/Analytics'
 import ScannedItems from './pages/admin/ScannedItems'
 import ApiMonitoring from './pages/admin/ApiMonitoring'
-import EnvironmentalData from './pages/admin/EnvironmentalData'
 import ProtectedRoute from './components/admin/ProtectedRoute'
 import { API_BASE_URL } from './config/api'
 import './App.css'
@@ -104,6 +105,8 @@ function App() {
         <Route path="/home" element={<Home />} />
         <Route path="/overview" element={<Overview />} />
         <Route path="/ai-analysis" element={<AiAnalysis />} />
+        <Route path="/sorting-grading" element={<SortingGrading />} />
+        <Route path="/environment" element={<Environment />} />
         <Route path="/community" element={<CommunityForum />} />
         <Route path="/user-features" element={<Navigate to="/community" replace />} />
         <Route path="/marketplace" element={<Navigate to="/community" replace />} />
@@ -116,7 +119,6 @@ function App() {
             <Route path="users" element={<UserManagement />} />
             <Route path="analytics" element={<Analytics />} />
             <Route path="scans" element={<ScannedItems />} />
-            <Route path="environment" element={<EnvironmentalData />} />
             <Route path="api-health" element={<ApiMonitoring />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Route>

@@ -44,12 +44,16 @@ def _weights_path(model: str | None = None) -> str | None:
   key = (model or "best").strip().lower()
 
   if key in ("best", "default", "main"):
-    local_best = _resolve_path(os.path.join("ml_models", "yolo_best.pt"), here)
-    if local_best:
-      return local_best
     env_best = _resolve_path(os.environ.get("DRAGON_YOLO_BEST_WEIGHTS"), here)
     if env_best:
       return env_best
+    # Prefer own-tuned weights first for production scoring quality.
+    local_best_own = _resolve_path(os.path.join("ml_models", "yolo_best_own.pt"), here)
+    if local_best_own:
+      return local_best_own
+    local_best = _resolve_path(os.path.join("ml_models", "yolo_best.pt"), here)
+    if local_best:
+      return local_best
     env_default = _resolve_path(os.environ.get("DRAGON_YOLO_WEIGHTS"), here)
     if env_default:
       return env_default
@@ -59,12 +63,16 @@ def _weights_path(model: str | None = None) -> str | None:
     return None
 
   if key in ("bad", "disease", "defect"):
-    local_bad = _resolve_path(os.path.join("ml_models", "yolo_bad.pt"), here)
-    if local_bad:
-      return local_bad
     env_bad = _resolve_path(os.environ.get("DRAGON_YOLO_BAD_WEIGHTS"), here)
     if env_bad:
       return env_bad
+    # Prefer own-tuned disease weights first.
+    local_bad_own = _resolve_path(os.path.join("ml_models", "yolo_bad_own.pt"), here)
+    if local_bad_own:
+      return local_bad_own
+    local_bad = _resolve_path(os.path.join("ml_models", "yolo_bad.pt"), here)
+    if local_bad:
+      return local_bad
     return None
 
   custom = _resolve_path(key, here)

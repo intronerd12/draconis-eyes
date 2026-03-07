@@ -269,9 +269,10 @@ export default function ScanScreen({ user }) {
     const harvestReadiness = formatPercent(scanResult.harvest_readiness_score);
     const wingTipSignal =
       typeof scanResult.wings_tip_signal === 'number' ? scanResult.wings_tip_signal.toFixed(1) : '--';
+    const insectRiskScore = formatPercent(scanResult.insect_risk_score);
     const insectRisk =
       scanResult.insect_risk_level
-        ? `${String(scanResult.insect_risk_level)} (${scanResult.insect_risk_score || 0})`
+        ? `${String(scanResult.insect_risk_level)} (${insectRiskScore === '--' ? '0%' : insectRiskScore})`
         : '--';
     const displayGrade = isNoFruit ? 'No grade' : (scanResult.grade || '--');
     const displayFruitType = isNoFruit ? 'No dragon fruit detected' : (scanResult.fruit_type || '--');
@@ -469,14 +470,6 @@ export default function ScanScreen({ user }) {
                 <Text style={styles.detailValue}>{scanResult.grade || '--'}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Segmentation:</Text>
-                <Text style={styles.detailValue}>
-                  {scanResult.detection_backend === 'yolo_dual'
-                    ? 'YOLO (best + bad) + Masking'
-                    : (scanResult.detection_backend === 'yolo' ? 'YOLO + Masking' : 'Masking (Heuristic)')}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Size Category:</Text>
                 <Text style={styles.detailValue}>{scanResult.size_category || '--'}</Text>
               </View>
@@ -489,18 +482,8 @@ export default function ScanScreen({ user }) {
                 <Text style={styles.detailValue}>{harvestReadiness}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Market Value:</Text>
-                <Text style={styles.detailValue}>
-                  {scanResult.market_value_label ? `${scanResult.market_value_label} (${scanResult.market_value_score || 0})` : '--'}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Predicted Price:</Text>
                 <Text style={styles.detailValue}>{formatPesoPerKg(scanResult.estimated_price_per_kg)}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Price Model:</Text>
-                <Text style={styles.detailValue}>{priceModel?.method || 'Linear progression model'}</Text>
               </View>
             </Card.Content>
           </Card>}

@@ -90,8 +90,9 @@ PH_GRADE_PRICE_BANDS = {
     "E": (40.0, 85.0),
 }
 TRAINING_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "training_uploads", "images")
-YOLO_BEST_WEIGHTS_PATH = os.path.join(os.path.dirname(__file__), "ml_models", "yolo_best.pt")
-YOLO_BAD_WEIGHTS_PATH = os.path.join(os.path.dirname(__file__), "ml_models", "yolo_bad.pt")
+# Prefer own-tuned weights for deployment defaults.
+YOLO_BEST_WEIGHTS_PATH = os.path.join(os.path.dirname(__file__), "ml_models", "yolo_best_own.pt")
+YOLO_BAD_WEIGHTS_PATH = os.path.join(os.path.dirname(__file__), "ml_models", "yolo_bad_own.pt")
 
 # Active-learning queue (opt-in via env)
 SELFTRAIN_QUEUE_JSONL = os.path.join(DATA_DIR, "selftrain_queue.jsonl")
@@ -196,9 +197,9 @@ def _grade_from_area_ratio(fruit_area_ratio: float) -> str:
     ratio = float(np.clip(float(fruit_area_ratio), 0.0, 1.0))
     if ratio <= 0.0:
         return "N/A"
-    if ratio < 0.08:
+    if ratio < 0.03:
         return "C"
-    if ratio < 0.18:
+    if ratio < 0.10:
         return "B"
     return "A"
 
@@ -866,6 +867,34 @@ def _compute_quality_index(
     return float(np.clip(quality_index, 0.0, 100.0))
 
 
+def _compute_confidence_score(
+    is_valid_fruit: bool,
+    best_yolo_conf: float,
+    yolo_bad_best_conf: float,
+    quality_score: float,
+    defect_level: str,
+    fruit_area_ratio: float,
+) -> float:
+    if not is_valid_fruit:
+        return 0.0
+
+    yolo_pct = float(np.clip(float(best_yolo_conf) * 100.0, 0.0, 100.0))
+    quality_pct = float(np.clip(float(quality_score), 0.0, 100.0))
+    area_pct = float(np.clip(float(fruit_area_ratio) * 260.0, 0.0, 100.0))
+    disease_penalty = float(np.clip(float(yolo_bad_best_conf) * 28.0, 0.0, 28.0))
+
+    score = (0.64 * yolo_pct) + (0.24 * quality_pct) + (0.12 * area_pct) - disease_penalty
+
+    if defect_level == "low" and float(yolo_bad_best_conf) < 0.45 and float(best_yolo_conf) >= 0.55:
+        score = max(score + 8.0, 90.0)
+    elif defect_level == "medium":
+        score -= 4.0
+    elif defect_level == "high":
+        score -= 10.0
+
+    return float(np.clip(score, 0.0, 99.0))
+
+
 def _harvest_assessment(ripeness_score: float, defect_level: str, wing_tip_signal: float) -> dict:
     wing_norm = float(np.clip((wing_tip_signal + 20.0) / 40.0, 0.0, 1.0))
     ripeness_norm = float(np.clip(ripeness_score / 100.0, 0.0, 1.0))
@@ -1009,8 +1038,8 @@ async def detect_quality(
         # By default, mobile scans may fall back to heuristic mode when YOLO is unavailable.
         yolo_required = bool(require_yolo == 1 or (is_mobile_source and strict_mobile_requirements))
         dual_yolo_required = bool(require_dual_yolo == 1 or (is_mobile_source and strict_mobile_requirements))
-        required_weights_name = str(require_weights or "yolo_best.pt").strip().lower()
-        required_bad_weights_name = str(require_bad_weights or "yolo_bad.pt").strip().lower()
+        required_weights_name = str(require_weights or "yolo_best_own.pt").strip().lower()
+        required_bad_weights_name = str(require_bad_weights or "yolo_bad_own.pt").strip().lower()
         active_weights_path = str(getattr(yolo_runtime, "weights_path", "") or "")
         active_weights_name = os.path.basename(active_weights_path).lower() if active_weights_path else ""
         active_bad_weights_path = str(getattr(yolo_bad_runtime, "weights_path", "") or "")
@@ -1020,7 +1049,7 @@ async def detect_quality(
                 status_code=503,
                 detail=(
                     "YOLO model is required for mobile scanning but is not loaded. "
-                    "Ensure backend/ml_models/yolo_best.pt exists and restart the AI service."
+                    "Ensure backend/ml_models/yolo_best_own.pt exists and restart the AI service."
                 ),
             )
         if yolo_required and required_weights_name and active_weights_name != required_weights_name:
@@ -1036,7 +1065,7 @@ async def detect_quality(
                 status_code=503,
                 detail=(
                     "Mobile scan requires disease model yolo_bad.pt but it is not loaded. "
-                    "Ensure backend/ml_models/yolo_bad.pt exists and restart the AI service."
+                    "Ensure backend/ml_models/yolo_bad_own.pt exists and restart the AI service."
                 ),
             )
         if dual_yolo_required and required_bad_weights_name and active_bad_weights_name != required_bad_weights_name:
@@ -1235,9 +1264,16 @@ async def detect_quality(
             ripeness_score = min(99, 60 + (redness_ratio * 100))
             fruit_status = "Ripe"
             
-        # 3. Quality Score based on Brightness/Vibrancy
+        # 3. Quality Score calibrated for real-world captures (brightness + color + model confidence)
         brightness = (r + g + b) / 3
-        quality_score = min(98, (brightness / 255) * 100 + 40) # Simple heuristic
+        saturation = max(r, g, b) - min(r, g, b)
+        quality_score = (
+            56.0
+            + ((brightness / 255.0) * 26.0)
+            + ((saturation / 255.0) * 14.0)
+            + (max(0.0, best_yolo_conf - 0.45) * 30.0)
+        )
+        quality_score = float(np.clip(quality_score, 20.0, 99.0))
         
         # 4. Defect Detection (Simple Blob/Contrast)
         # Convert to grayscale (defects should be computed on the fruit region, not background)
@@ -1343,6 +1379,13 @@ async def detect_quality(
         ):
             disease_status = "Minor spotting with possible insect stress"
 
+        # Keep confidence-facing quality high when healthy detections are strong.
+        if is_valid_fruit and defect_level == "low" and yolo_bad_best_conf < 0.45:
+            if best_yolo_conf >= 0.72 and ripeness_score >= 70:
+                quality_score = max(quality_score, 90.0)
+            elif best_yolo_conf >= 0.58 and ripeness_score >= 65:
+                quality_score = max(quality_score, 85.0)
+
         harvest = _harvest_assessment(ripeness_score, defect_level, wing_tip_signal)
 
         # Shelf-life logic
@@ -1412,7 +1455,11 @@ async def detect_quality(
 
             # Keep valid fruit in A/B/C bands for operational grading.
             grade = _upgrade_grade_floor(grade, "C")
-            grade = _grade_cap_by_area(grade, area_grade_anchor)
+            # Apply strict area cap only when fruit coverage is tiny or detection is weak.
+            if area_grade_anchor == "C" and (fruit_area_ratio < 0.03 or best_yolo_conf < 0.42):
+                grade = _grade_cap_by_area(grade, "C")
+            elif area_grade_anchor == "B" and defect_level != "low":
+                grade = _grade_cap_by_area(grade, "B")
 
         features = {
             "quality_score": float(round(quality_score, 3)),
@@ -1423,6 +1470,14 @@ async def detect_quality(
             "grade_num": _grade_num(grade),
             "size_num": _size_num(size_category),
         }
+        confidence_score = _compute_confidence_score(
+            is_valid_fruit=is_valid_fruit,
+            best_yolo_conf=best_yolo_conf,
+            yolo_bad_best_conf=yolo_bad_best_conf,
+            quality_score=quality_score,
+            defect_level=defect_level,
+            fruit_area_ratio=fruit_area_ratio,
+        )
 
         model_price = 0.0
         baseline_price = 0.0
@@ -1508,6 +1563,7 @@ async def detect_quality(
             "weight_grams_est": weight_grams,
             "ripeness_score": round(ripeness_score, 1),
             "quality_score": round(quality_score, 1),
+            "confidence_score": round(confidence_score, 1) if is_valid_fruit else 0.0,
             "grade_score": round(quality_index, 1) if is_valid_fruit else None,
             "defect_probability": round(defect_probability, 1),
             "shape_quality": shape_quality,
@@ -1588,6 +1644,7 @@ async def detect_quality(
                     "weight_grams_est": 0,
                     "ripeness_score": 0.0,
                     "quality_score": 0.0,
+                    "confidence_score": 0.0,
                     "grade_score": None,
                     "defect_probability": 0.0,
                     "shape_quality": "No result",
