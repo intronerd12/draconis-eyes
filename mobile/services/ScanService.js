@@ -76,6 +76,50 @@ const resolveUserMeta = (user) => {
 
 const normalizeComparable = (value) => String(value ?? '').trim().toLowerCase();
 
+const normalizeGrade = (value) => {
+  if (value === undefined || value === null) return 'N/A';
+
+  const raw = String(value).trim().toUpperCase();
+  if (!raw || raw === '-' || raw === '--') return 'N/A';
+
+  if (
+    raw === 'N/A' ||
+    raw === 'NA' ||
+    raw === 'NONE' ||
+    raw === 'NO GRADE' ||
+    raw === 'NO RESULT' ||
+    raw === 'UNKNOWN'
+  ) {
+    return 'N/A';
+  }
+
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric)) {
+    const mapped = { 5: 'A', 4: 'B', 3: 'C', 2: 'D', 1: 'E' }[Math.round(numeric)];
+    if (mapped) return mapped;
+  }
+
+  const contextual = raw.match(/\b(?:GRADE|CLASS)\s*([A-E])(?:\+|-)?\b/);
+  if (contextual?.[1]) return contextual[1];
+
+  const letterOnly = raw.match(/\b([A-E])(?:\+|-)?\b/);
+  if (letterOnly?.[1]) return letterOnly[1];
+
+  return 'N/A';
+};
+
+const normalizeLocalScan = (scan, index = 0) => {
+  const fallbackId = `local-${index}`;
+  const normalizedId = String(scan?.id ?? scan?.localScanId ?? fallbackId).trim() || fallbackId;
+
+  return {
+    ...scan,
+    id: normalizedId,
+    localScanId: String(scan?.localScanId ?? normalizedId).trim() || normalizedId,
+    grade: normalizeGrade(scan?.grade),
+  };
+};
+
 const belongsToUser = (scan, userMeta) => {
   const rowUserId = String(scan?.user?._id ?? scan?.user ?? scan?.userId ?? scan?.user_id ?? '').trim();
   const rowEmail = normalizeComparable(scan?.operatorEmail ?? scan?.email ?? scan?.user?.email);
@@ -105,7 +149,7 @@ const normalizeRemoteScan = (scan, index = 0) => {
     localScanId: String(scan?.localScanId ?? normalizedId).trim(),
     timestamp: scan?.timestamp || scan?.createdAt || new Date().toISOString(),
     imageUri: String(scan?.imageUrl ?? scan?.imageUri ?? '').trim(),
-    grade: String(scan?.grade ?? 'N/A').toUpperCase(),
+    grade: normalizeGrade(scan?.grade),
     notes: String(scan?.details ?? scan?.notes ?? '').trim(),
     fruit_type: String(scan?.fruitType ?? scan?.fruit_type ?? 'Dragon Fruit').trim(),
     estimated_price_per_kg: toFiniteNumber(scan?.estimated_price_per_kg ?? scan?.estimatedPricePerKg, 0),
@@ -254,7 +298,7 @@ const sanitizeScanForStorage = (scan) => {
     localScanId: scan.localScanId || scan.id,
     timestamp: scan.timestamp,
     imageUri: scan.imageUri,
-    grade: scan.grade,
+    grade: normalizeGrade(scan?.grade),
     notes: truncateText(scan.notes || scan.details || '', 320),
     fruit_type: truncateText(scan.fruit_type || scan.fruitType || '', 120),
     is_valid_fruit: scan.is_valid_fruit,
@@ -297,7 +341,7 @@ const persistScans = async (scans, user) => {
 const buildScanPayload = (scan, user) => {
   const { userId, userName, userEmail } = resolveUserMeta(user);
   return {
-    grade: scan?.grade || 'UNKNOWN',
+    grade: normalizeGrade(scan?.grade),
     details: scan?.notes || scan?.fruit_type || 'No details provided',
     imageUrl: scan?.imageUri,
     location: scan?.location,
@@ -489,7 +533,12 @@ export const ScanService = {
         throw new Error(errorData?.message || errorData?.detail || 'Analysis failed');
       }
 
-      return await response.json();
+      const result = await response.json();
+      if (!result || typeof result !== 'object') return result;
+      return {
+        ...result,
+        grade: normalizeGrade(result?.grade),
+      };
     } catch (e) {
       console.error('Error analyzing image:', e);
       throw e;
@@ -568,7 +617,11 @@ export const ScanService = {
         localScans = await persistScans(parsed, user);
       }
 
-      return mergeScans(localScans, remoteScans);
+      const normalizedLocalScans = localScans
+        .filter((scan) => scan && typeof scan === 'object')
+        .map((scan, index) => normalizeLocalScan(scan, index));
+
+      return mergeScans(normalizedLocalScans, remoteScans);
     } catch (e) {
       console.error('Error reading scans', e);
       if (isStorageOverflowError(e)) {
@@ -606,6 +659,7 @@ export const ScanService = {
       timestamp,
       ...scan,
       imageUri: finalImageUri,
+      grade: normalizeGrade(scan?.grade),
     };
 
     try {

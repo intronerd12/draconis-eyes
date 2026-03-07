@@ -132,6 +132,12 @@ function AuthPro() {
     try {
       setIsLoading(true);
       const provider = providerName === 'google' ? googleProvider : facebookProvider;
+      
+      // Add custom parameters to force account selection if needed
+      if (providerName === 'google') {
+        provider.setCustomParameters({ prompt: 'select_account' });
+      }
+
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
@@ -169,7 +175,20 @@ function AuthPro() {
       window.location.href = data.role === 'admin' ? '/admin' : '/home';
     } catch (error) {
       console.error('Social Auth Error:', error);
-      toast.error(error.message || 'Social authentication failed');
+      
+      if (error.code === 'auth/popup-closed-by-user') {
+        toast.error('Login popup was closed. Please try again.');
+      } else if (error.code === 'auth/cancelled-by-user') {
+        toast.error('Login was cancelled.');
+      } else if (error.code === 'auth/account-exists-with-different-credential') {
+        toast.error('An account already exists with this email using a different login method.');
+      } else if (error.code === 'auth/auth-domain-config-required') {
+        toast.error('Firebase Auth domain configuration error. Check your Firebase settings.');
+      } else if (error.code === 'auth/operation-not-allowed') {
+        toast.error('This login method is not enabled in Firebase Console.');
+      } else {
+        toast.error(error.message || 'Social authentication failed');
+      }
     } finally {
       setIsLoading(false);
     }
