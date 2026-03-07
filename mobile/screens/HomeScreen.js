@@ -50,6 +50,16 @@ const TIPS = [
   { id: 3, key: 'health', title: 'Health Benefits', icon: 'heart', color: '#55EFC4' },
 ];
 
+const getGradeColor = (grade) => {
+  const value = String(grade || 'N/A').toUpperCase();
+  if (value === 'A') return '#4CAF50';
+  if (value === 'B') return '#8BC34A';
+  if (value === 'C') return '#FF9800';
+  if (value === 'D') return '#EF5350';
+  if (value === 'E') return '#D32F2F';
+  return '#90A4AE';
+};
+
 export default function HomeScreen({ user, onLogout }) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -462,16 +472,11 @@ export default function HomeScreen({ user, onLogout }) {
                         style={[
                           styles.gradeValue,
                           {
-                            color:
-                              item.grade === 'A'
-                                ? '#4CAF50'
-                                : item.grade === 'B'
-                                  ? '#FFC107'
-                                  : '#FF5252',
+                            color: getGradeColor(item.grade),
                           },
                         ]}
                       >
-                        {item.grade || '-'}
+                        {String(item.grade || 'N/A').toUpperCase()}
                       </Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="rgba(0,0,0,0.35)" />

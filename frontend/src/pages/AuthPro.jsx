@@ -171,8 +171,8 @@ function AuthPro() {
       localStorage.setItem('user', JSON.stringify(data));
       toast.success(`Welcome back, ${data.name}!`);
       
-      // Force reload or navigate
-      window.location.href = data.role === 'admin' ? '/admin' : '/home';
+      // Use navigate for a smooth SPA transition and to avoid server-side 404s
+      navigate(data.role === 'admin' ? '/admin' : '/home');
     } catch (error) {
       console.error('Social Auth Error:', error);
       

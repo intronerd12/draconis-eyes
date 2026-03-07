@@ -5,7 +5,19 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ScanService } from '../services/ScanService';
 
-const gradeRank = { A: 3, B: 2, C: 1, 'N/A': 0 };
+const gradeRank = { A: 5, B: 4, C: 3, D: 2, E: 1, 'N/A': 0 };
+
+const getGradeTone = (grade) => {
+  const value = String(grade || 'N/A').toUpperCase();
+
+  if (value === 'A') return { bg: 'rgba(76, 175, 80, 0.14)', text: '#2E7D32' };
+  if (value === 'B') return { bg: 'rgba(139, 195, 74, 0.16)', text: '#558B2F' };
+  if (value === 'C') return { bg: 'rgba(255, 152, 0, 0.18)', text: '#EF6C00' };
+  if (value === 'D') return { bg: 'rgba(239, 83, 80, 0.14)', text: '#C62828' };
+  if (value === 'E') return { bg: 'rgba(211, 47, 47, 0.16)', text: '#B71C1C' };
+
+  return { bg: 'rgba(176, 190, 197, 0.24)', text: '#546E7A' };
+};
 
 export default function SortingGradingScreen({ user }) {
   const [scans, setScans] = useState([]);
@@ -120,7 +132,7 @@ export default function SortingGradingScreen({ user }) {
           <Card.Content>
             <Text style={styles.sectionLabel}>Grade Filter</Text>
             <View style={styles.chipsRow}>
-              {['All', 'A', 'B', 'C', 'N/A'].map((g) => (
+              {['All', 'A', 'B', 'C', 'D', 'E', 'N/A'].map((g) => (
                 <Chip
                   key={g}
                   selected={gradeFilter === g}
@@ -185,14 +197,16 @@ export default function SortingGradingScreen({ user }) {
             </Card.Content>
           </Card>
         ) : (
-          sorted.map((s) => (
-            <Card key={s.id} style={styles.itemCard}>
-              <Card.Content style={styles.itemContent}>
+          sorted.map((s) => {
+            const gradeTone = getGradeTone(s.grade);
+            return (
+              <Card key={s.id} style={styles.itemCard}>
+                <Card.Content style={styles.itemContent}>
                 <Image source={{ uri: s.imageUri }} style={styles.thumb} />
                 <View style={styles.itemMain}>
                   <View style={styles.itemTopRow}>
-                    <View style={styles.gradeBadge}>
-                      <Text style={styles.gradeBadgeText}>{s.grade || 'N/A'}</Text>
+                    <View style={[styles.gradeBadge, { backgroundColor: gradeTone.bg }]}>
+                      <Text style={[styles.gradeBadgeText, { color: gradeTone.text }]}>{String(s.grade || 'N/A').toUpperCase()}</Text>
                     </View>
                     <View style={styles.itemRightTop}>
                       <Text style={styles.priceText}>{formatPesoPerKg(s.estimated_price_per_kg)}</Text>
@@ -213,9 +227,10 @@ export default function SortingGradingScreen({ user }) {
                     {s.timestamp ? new Date(s.timestamp).toLocaleString() : ''}
                   </Text>
                 </View>
-              </Card.Content>
-            </Card>
-          ))
+                </Card.Content>
+              </Card>
+            );
+          })
         )}
       </ScrollView>
     </View>
@@ -322,13 +337,11 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: 'rgba(199, 21, 133, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   gradeBadgeText: {
     fontWeight: '900',
-    color: '#C71585',
     fontSize: 16,
   },
   priceText: {
