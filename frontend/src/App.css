@@ -1277,10 +1277,10 @@ nav {
   justify-content: center;
   gap: 12px;
   padding: 12px;
-  background: white;
-  border: 1px solid var(--gray-200);
+  background: #dc2626; /* Vibrant Red */
+  border: 1px solid #dc2626;
   border-radius: 12px;
-  color: var(--gray-700);
+  color: white;
   font-weight: 600;
   font-size: 15px;
   cursor: pointer;
@@ -1288,9 +1288,9 @@ nav {
 }
 
 .auth-btn-google-full:hover {
-  background: var(--gray-50);
-  border-color: var(--gray-300);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  background: #b91c1c; /* Darker Red on hover */
+  border-color: #b91c1c;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
   transform: translateY(-1px);
 }
 
@@ -1300,6 +1300,7 @@ nav {
 
 .auth-btn-google-full svg {
   flex-shrink: 0;
+  color: white; /* Ensure SVG is white */
 }
 
 .auth-toggle-pro {
