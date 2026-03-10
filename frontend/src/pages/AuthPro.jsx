@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ArrowLeft, BarChart3, Eye, EyeOff, ScanLine, ShieldCheck } from 'lucide-react';
 import { signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider, facebookProvider } from '../config/firebase';
+import { auth, googleProvider } from '../config/firebase';
 import BrandMark from '../components/BrandMark';
 import { BRAND_NAME, BRAND_TAGLINE } from '../config/brand';
 import { API_BASE_URL } from '../config/api';
@@ -131,12 +131,10 @@ function AuthPro() {
   const handleSocialLogin = async (providerName) => {
     try {
       setIsLoading(true);
-      const provider = providerName === 'google' ? googleProvider : facebookProvider;
+      const provider = googleProvider;
       
       // Add custom parameters to force account selection if needed
-      if (providerName === 'google') {
-        provider.setCustomParameters({ prompt: 'select_account' });
-      }
+      provider.setCustomParameters({ prompt: 'select_account' });
 
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
@@ -148,8 +146,7 @@ function AuthPro() {
         body: JSON.stringify({
           name: user.displayName,
           email: user.email,
-          googleId: providerName === 'google' ? user.uid : undefined,
-          facebookId: providerName === 'facebook' ? user.uid : undefined,
+          googleId: user.uid,
           avatar: user.photoURL,
         }),
       });
@@ -338,39 +335,21 @@ function AuthPro() {
 
               <div className="auth-divider">
                 <span />
-                <div>or continue with</div>
+                <div>or</div>
                 <span />
               </div>
 
-              <div className="auth-social-grid">
-                <button
-                  type="button"
-                  onClick={() => handleSocialLogin('google')}
-                  disabled={isLoading}
-                  className="auth-btn-social auth-btn-google"
-                >
-                  <svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24" style={{ width: 18, height: 18 }}>
-                    <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .533 5.333.533 12S5.867 24 12.48 24c3.44 0 6.147-1.133 8.213-3.293 2.1-2.173 2.72-5.453 2.72-8.24 0-.573-.053-1.093-.147-1.547H12.48z" />
-                  </svg>
-                  <span>Google</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleSocialLogin('facebook')}
-                  disabled={isLoading}
-                  className="auth-btn-social auth-btn-facebook"
-                >
-                  <svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24" style={{ width: 18, height: 18 }}>
-                    <path
-                      fillRule="evenodd"
-                      d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  <span>Facebook</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => handleSocialLogin('google')}
+                disabled={isLoading}
+                className="auth-btn-google-full"
+              >
+                <svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24" style={{ width: 20, height: 20 }}>
+                  <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .533 5.333.533 12S5.867 24 12.48 24c3.44 0 6.147-1.133 8.213-3.293 2.1-2.173 2.72-5.453 2.72-8.24 0-.573-.053-1.093-.147-1.547H12.48z" />
+                </svg>
+                <span>Continue with Google</span>
+              </button>
             </form>
             ) : (
               <div className="auth-form">

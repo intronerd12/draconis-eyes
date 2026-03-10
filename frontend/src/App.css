@@ -1270,6 +1270,38 @@ nav {
   background: var(--gray-200);
 }
 
+.auth-btn-google-full {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px;
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  color: var(--gray-700);
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.auth-btn-google-full:hover {
+  background: var(--gray-50);
+  border-color: var(--gray-300);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transform: translateY(-1px);
+}
+
+.auth-btn-google-full:active {
+  transform: translateY(0);
+}
+
+.auth-btn-google-full svg {
+  flex-shrink: 0;
+}
+
 .auth-toggle-pro {
   display: flex;
   justify-content: center;
